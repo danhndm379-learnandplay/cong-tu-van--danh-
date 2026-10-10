@@ -1,5 +1,21 @@
 import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
-import { chatLimits, type ChatErrorCode, type ChatMessage } from "@/lib/chatbot-config";
+import { cookies } from "next/headers";
+import {
+  appendTurn,
+  findLatestConversationId,
+  hashVisitorToken,
+  isValidVisitorToken,
+  listMessages,
+  newVisitorToken,
+  VISITOR_COOKIE,
+  VISITOR_COOKIE_MAX_AGE,
+} from "@/lib/chat-store";
+import {
+  chatLimits,
+  type ChatErrorCode,
+  type ChatMessage,
+  type StoredMessage,
+} from "@/lib/chatbot-config";
 import { chatbotQna, fallbackEntry } from "@/lib/chatbot-qna";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -65,15 +81,9 @@ function clientKey(request: Request) {
   return forwarded || request.headers.get("x-real-ip") || "local";
 }
 
-function isChatMessage(m: unknown): m is ChatMessage {
-  if (typeof m !== "object" || m === null) return false;
-  const { from, text } = m as Record<string, unknown>;
-  return (from === "bot" || from === "user") && typeof text === "string";
-}
-
 type Turn = { role: "user" | "model"; text: string };
 
-// Chuẩn hoá lịch sử do client gửi: cắt độ dài, bắt đầu bằng lượt user, gộp lượt liên tiếp cùng vai trò,
+// Chuẩn hoá lịch sử (đọc từ database + câu mới của khách): cắt độ dài, bắt đầu bằng lượt user, gộp lượt liên tiếp cùng vai trò,
 // giới hạn tổng độ dài, và kết thúc bằng lượt user. Trả về null nếu không còn gì hợp lệ.
 function normalizeHistory(messages: ChatMessage[]): Turn[] | null {
   const turns: Turn[] = [];
@@ -110,28 +120,21 @@ function extractReply(raw: string | undefined) {
   }
 }
 
-export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return errorResponse("not_configured", 500);
+const RATE_LIMIT_READ_PER_IP = 60;
+const NO_STORE = { "Cache-Control": "no-store" };
 
-  const perIp = checkRateLimit(`ip:${clientKey(request)}`, RATE_LIMIT_PER_IP);
-  const global = perIp.ok ? checkRateLimit("global", RATE_LIMIT_GLOBAL) : perIp;
-  if (!global.ok) {
-    return errorResponse("rate_limited", 429, { "Retry-After": String(global.retryAfterSec) });
-  }
+/** Trả về Response 429 nếu vượt giới hạn, ngược lại null. `perIp` là số request/phút cho mỗi IP. */
+function rateLimitResponse(request: Request, bucket: string, perIp: number, withGlobal: boolean) {
+  const result = checkRateLimit(`${bucket}:${clientKey(request)}`, perIp);
+  const final = result.ok && withGlobal ? checkRateLimit("global", RATE_LIMIT_GLOBAL) : result;
+  return final.ok
+    ? null
+    : errorResponse("rate_limited", 429, { "Retry-After": String(final.retryAfterSec) });
+}
 
-  let history: Turn[] | null;
-  try {
-    const body = await request.json();
-    if (!Array.isArray(body?.messages)) throw new Error("invalid");
-    const recent: unknown[] = body.messages.slice(-chatLimits.maxHistory);
-    if (!recent.every(isChatMessage)) throw new Error("invalid");
-    history = normalizeHistory(recent);
-  } catch {
-    history = null;
-  }
-  if (!history) return errorResponse("bad_request", 400);
+type GeminiResult = { ok: true; text: string } | { ok: false; code: ChatErrorCode };
 
+async function askGemini(apiKey: string, history: Turn[]): Promise<GeminiResult> {
   const ai = new GoogleGenAI({ apiKey });
   const generateRequest = {
     model: MODEL,
@@ -154,7 +157,7 @@ export async function POST(request: Request) {
       const response = await ai.models.generateContent(generateRequest);
       const text = extractReply(response.text);
       if (!text) throw new Error("empty response");
-      return Response.json({ text });
+      return { ok: true, text };
     } catch (err) {
       const status = (err as { status?: number }).status;
       if (status === 503 && attempt < chatLimits.maxAttempts) {
@@ -162,8 +165,86 @@ export async function POST(request: Request) {
         continue;
       }
       console.error("[api/chat] Gemini error:", err);
-      const busy = status === 503 || status === 429;
-      return errorResponse(busy ? "upstream_busy" : "upstream_error", 502);
+      return { ok: false, code: status === 503 || status === 429 ? "upstream_busy" : "upstream_error" };
     }
   }
+}
+
+// GET: trả lại cuộc trò chuyện gần nhất của khách (nhận diện bằng cookie httpOnly), đọc từ database.
+export async function GET(request: Request) {
+  const limited = rateLimitResponse(request, "read", RATE_LIMIT_READ_PER_IP, false);
+  if (limited) return limited;
+
+  try {
+    const token = (await cookies()).get(VISITOR_COOKIE)?.value;
+    if (!isValidVisitorToken(token)) return Response.json({ messages: [] }, { headers: NO_STORE });
+
+    const conversationId = await findLatestConversationId(hashVisitorToken(token));
+    const messages = conversationId ? await listMessages(conversationId) : [];
+    return Response.json({ messages }, { headers: NO_STORE });
+  } catch (err) {
+    console.error("[api/chat] Storage error (GET):", err);
+    return errorResponse("storage_error", 500);
+  }
+}
+
+// POST: nhận MỘT câu hỏi của khách; lịch sử lấy từ database (không tin lịch sử do trình duyệt gửi),
+// gọi Gemini, lưu cả câu hỏi và câu trả lời vào database rồi trả lại đúng các dòng đã lưu.
+export async function POST(request: Request) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return errorResponse("not_configured", 500);
+
+  const limited = rateLimitResponse(request, "ip", RATE_LIMIT_PER_IP, true);
+  if (limited) return limited;
+
+  let message = "";
+  try {
+    const body = await request.json();
+    if (typeof body?.message === "string") {
+      message = body.message.trim().slice(0, chatLimits.maxMessageLength);
+    }
+  } catch {
+    // body không phải JSON hợp lệ: xử lý như thiếu message bên dưới
+  }
+  if (!message) return errorResponse("bad_request", 400);
+
+  const cookieStore = await cookies();
+  const existingToken = cookieStore.get(VISITOR_COOKIE)?.value;
+  const token = isValidVisitorToken(existingToken) ? existingToken : newVisitorToken();
+  const visitorHash = hashVisitorToken(token);
+
+  let conversationId: string | null = null;
+  let past: StoredMessage[] = [];
+  try {
+    if (token === existingToken) {
+      conversationId = await findLatestConversationId(visitorHash);
+      if (conversationId) past = await listMessages(conversationId, chatLimits.maxHistory);
+    }
+  } catch (err) {
+    console.error("[api/chat] Storage error (load history):", err);
+    return errorResponse("storage_error", 500);
+  }
+
+  const history = normalizeHistory([...past, { from: "user", text: message }]);
+  if (!history) return errorResponse("bad_request", 400);
+
+  const reply = await askGemini(apiKey, history);
+  if (!reply.ok) return errorResponse(reply.code, 502);
+
+  let saved: StoredMessage[];
+  try {
+    saved = await appendTurn(visitorHash, conversationId, message, reply.text.slice(0, 4000));
+  } catch (err) {
+    console.error("[api/chat] Storage error (save):", err);
+    return errorResponse("storage_error", 500);
+  }
+
+  cookieStore.set(VISITOR_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: VISITOR_COOKIE_MAX_AGE,
+  });
+  return Response.json({ messages: saved }, { headers: NO_STORE });
 }

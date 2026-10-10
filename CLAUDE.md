@@ -20,7 +20,7 @@ npm run start   # chạy bản build
 npm run lint    # ESLint 9 (flat config, eslint.config.mjs)
 ```
 
-Repo chưa có test framework nên không có lệnh chạy test. Chatbot cần `GEMINI_API_KEY` trong `.env.local` (copy từ `.env.example`; file này đã được gitignore). Không có key thì `/api/chat` trả 500, phần còn lại của site vẫn chạy. Các biến Supabase sẽ dùng từ Tuần 3.
+Repo chưa có test framework nên không có lệnh chạy test. Chatbot cần `GEMINI_API_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` trong `.env.local` (copy từ `.env.example`; file này đã được gitignore). Thiếu key thì `/api/chat` báo lỗi, phần còn lại của site vẫn chạy.
 
 ## Kiến trúc
 
@@ -40,6 +40,7 @@ Repo chưa có test framework nên không có lệnh chạy test. Chatbot cần 
   - `route.ts` chuẩn hoá lịch sử do client gửi (cắt độ dài, gộp lượt trùng vai, bắt đầu/kết thúc bằng lượt user). Client gửi cả lượt bot nên về nguyên tắc có thể bị giả mạo — chấp nhận được vì user vốn tự gõ được mọi thứ; muốn chặt hơn phải lưu hội thoại phía server (Tuần 3).
   - Ngôn ngữ: model phải khai báo `user_language` trước rồi mới viết `reply` (structured output JSON), nhờ vậy trả lời đúng ngôn ngữ người dùng mà không cần dò ngôn ngữ trong code. Tiếng Anh/Việt ổn định; tiếng Nhật/Hàn với model lite còn sai. Bị lỗi 429/503 từ Google thì route trả `upstream_busy` (503 được retry tối đa 3 lần).
   - `temperature: 0` và `ThinkingLevel.MINIMAL` (chỉnh qua `GEMINI_THINKING_LEVEL`) để trả lời nhanh (~1s); không phải model nào cũng hỗ trợ `MINIMAL` (`gemini-3.8-flash` từ chối).
+- **Lưu hội thoại chatbot (Supabase):** mỗi cuộc trò chuyện lưu ở bảng `conversations`/`messages` (migration: `supabase/migrations/`). Đây là dữ liệu riêng tư: RLS bật, `anon`/`authenticated` bị thu hồi quyền và có policy `using (false)`, chỉ `service_role` truy cập được — không bao giờ thêm policy cho phép trình duyệt đọc/ghi, và không đọc các bảng này bằng publishable key. Mọi truy cập đi qua `lib/chat-store.ts` (có `import "server-only"`, dùng `createAdminClient` của `@supabase/server/core` với `SUPABASE_URL` + `SUPABASE_SECRET_KEY`). Khách được nhận diện bằng cookie httpOnly `duhoc24_visitor` (token ngẫu nhiên; DB chỉ lưu sha256). `GET /api/chat` trả lịch sử của khách, `POST /api/chat` nhận **một** câu `{ message }`, lấy lịch sử từ DB (không tin lịch sử từ trình duyệt), gọi Gemini, lưu cả hai tin rồi trả lại đúng các dòng đã lưu. Widget không lưu gì ở `localStorage`. Chưa có đăng nhập nên chưa gắn hội thoại với tài khoản; trang `/admin/conversations` vẫn dùng mock data và KHÔNG được nối với bảng thật cho tới khi `/admin` có xác thực (Tuần 6), vì đó là dữ liệu riêng tư của khách.
 - **Nút Duyệt/Từ chối** ở `/admin/requests` mới chỉ là UI, chưa có handler.
 
 ## UI conventions

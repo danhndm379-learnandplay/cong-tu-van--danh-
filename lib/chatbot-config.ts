@@ -5,7 +5,15 @@ export interface ChatMessage {
   text: string;
 }
 
+/** Tin nhắn đã lưu trong database, trả về cho widget để hiển thị. */
+export interface StoredMessage extends ChatMessage {
+  id: number;
+  createdAt: string;
+}
+
 export const chatLimits = {
+  /** Số tin nhắn gần nhất tải về để hiển thị khi mở lại khung chat. */
+  maxDisplayMessages: 100,
   /** Số tin nhắn gần nhất được gửi cho model. */
   maxHistory: 20,
   /** Độ dài tối đa của một tin nhắn (ký tự). */
@@ -22,7 +30,8 @@ export type ChatErrorCode =
   | "bad_request"
   | "rate_limited"
   | "upstream_busy"
-  | "upstream_error";
+  | "upstream_error"
+  | "storage_error";
 
 // Server chỉ trả mã lỗi; client tra thông điệp ở đây. Song ngữ vì lỗi xảy ra trước khi biết ngôn ngữ người dùng.
 export const chatErrorMessages: Record<ChatErrorCode | "network", string> = {
@@ -36,6 +45,8 @@ export const chatErrorMessages: Record<ChatErrorCode | "network", string> = {
     "Trợ lý đang bận, bạn thử lại sau ít phút nhé. / The assistant is busy, please try again in a few minutes.",
   upstream_error:
     "Trợ lý gặp sự cố, bạn thử lại sau nhé. / The assistant ran into a problem, please try again later.",
+  storage_error:
+    "Chưa lưu được cuộc trò chuyện, bạn thử gửi lại nhé. / We couldn't save the conversation, please try again.",
   network:
     "Có lỗi kết nối, bạn thử lại sau nhé. / Connection error, please try again later.",
 };
