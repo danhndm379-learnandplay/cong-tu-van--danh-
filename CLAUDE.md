@@ -1,1 +1,51 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 @AGENTS.md
+
+## Tổng quan
+
+DuHoc24 — website mẫu "Cổng Tiếp Nhận Hồ Sơ Du Học" cho khoá lập trình 6 tuần. Bản hiện tại là **Tuần 1: chỉ có UI tĩnh**, toàn bộ dữ liệu là mock data viết cứng trong `lib/mock-data.ts`. Chưa có API, database hay authentication. Lộ trình các tuần sau (Gemini API, Supabase, Make.com, magic link login) nằm trong `README.md`; trang `/login` cố ý chưa được dựng.
+
+Nội dung giao diện, tên biến trạng thái và comment đều bằng tiếng Việt (`lang="vi"`, font Be Vietnam Pro). Giữ nguyên quy ước này khi thêm UI/copy mới.
+
+## Commands
+
+```bash
+npm install
+npm run dev     # dev server tại http://localhost:3000
+npm run build   # production build (cũng chạy type-check)
+npm run start   # chạy bản build
+npm run lint    # ESLint 9 (flat config, eslint.config.mjs)
+```
+
+Repo chưa có test framework nên không có lệnh chạy test. Chatbot cần `GEMINI_API_KEY` trong `.env.local` (copy từ `.env.example`; file này đã được gitignore). Không có key thì `/api/chat` trả 500, phần còn lại của site vẫn chạy. Các biến Supabase sẽ dùng từ Tuần 3.
+
+## Kiến trúc
+
+- **Next.js 16 App Router + React 19 + TypeScript strict + Tailwind CSS v4.** Version này có breaking changes so với kiến thức cũ — đọc `node_modules/next/dist/docs/` trước khi viết code Next.js (xem `AGENTS.md`). Ví dụ: layout dùng type helper toàn cục `LayoutProps<"/">` thay vì tự khai báo props.
+- **Path alias:** `@/*` trỏ về root repo (ví dụ `@/components/ui/button`, `@/lib/mock-data`).
+- **Ba khu vực route:**
+  - `/` — landing page ghép từ `components/landing/*` (hero, quote-form, highlights, chat-widget) cùng `site-header`/`site-footer`.
+  - `/portal` — cổng học viên, ghép từ `components/portal/*`, đọc `currentStudent` từ mock data.
+  - `/admin/*` — dùng chung `app/admin/layout.tsx` (sidebar + mobile nav); `/admin` redirect sang `/admin/requests`. Các page con: `requests`, `schools`, `profiles`, `conversations`.
+- **Server Component là mặc định.** Các page admin/portal là Server Component import thẳng từ `lib/mock-data.ts`; chỉ những component cần state/tương tác mới có `"use client"` (`site-header`, `admin/sidebar`, `landing/quote-form`, `landing/chat-widget`, và vài wrapper trong `ui/`).
+- **`lib/mock-data.ts` là nguồn dữ liệu duy nhất.** Chứa các type (`DocStatus`, `RequestStatus`, `ServicePackage`, `School`, `AdmissionRequest`, `StudentProfile`, `Conversation`, ...) và dữ liệu mẫu. Giá trị enum là slug tiếng Việt không dấu (`cho_duyet`, `hop_le`, `co_ban`, ...). Khi nối Supabase ở các tuần sau, thay dữ liệu và giữ nguyên các type này nếu có thể để UI không phải đổi theo.
+- **Hiển thị trạng thái:** `components/status-badge.tsx` map `DocStatus`/`RequestStatus` sang tone màu + icon; dùng lại thay vì tự tạo badge mới.
+- **Chatbot (Gemini):** `landing/chat-widget.tsx` (client) POST toàn bộ lịch sử hội thoại tới route handler `app/api/chat/route.ts`, nơi gọi `@google/genai` với `systemInstruction` được dựng từ bộ QnA trong `lib/chatbot-qna.ts`. Bot luôn trả lời một nội dung liên quan đến câu hỏi, không bao giờ từ chối: câu khớp bộ QnA thì trả lời đúng theo bộ này; câu ngoài bộ thì trả lời bằng kiến thức chung, có ghi chú đây là thông tin tham khảo chứ không phải thông tin chính thức của DuHoc24, kèm hướng dẫn liên hệ (câu `fallback`); câu không liên quan du học thì trả lời ngắn rồi mời quay lại chủ đề du học. Prompt cấm bot khẳng định điều gì về dịch vụ của DuHoc24 (giá, thời gian, chính sách, cam kết, hỗ trợ visa...) ngoài những gì bộ QnA nêu rõ; muốn bot biết thêm về DuHoc24 thì thêm cặp hỏi–đáp vào file đó. Lưu ý: không viết câu mẫu tiếng Việt vào quy tắc của prompt, model lite sẽ bắt chước và trả lời tiếng Việt cho câu hỏi tiếng Anh. API key chỉ nằm phía server (`GEMINI_API_KEY`, `GEMINI_MODEL` trong `.env.local`, mặc định `gemini-3.5-flash-lite`). Tên model Gemini bị Google retire thường xuyên (`gemini-2.5-flash` đã trả 404) — nếu gặp 404 thì liệt kê model bằng `ai.models.list()` rồi đổi `GEMINI_MODEL`. Cấu trúc chatbot:
+  - `lib/chatbot-qna.ts`: bộ QnA; cờ `suggested` → nút gợi ý trong widget, cờ `fallback` → câu dùng khi hỏi ngoài phạm vi (prompt lấy từ cờ này, không trỏ theo chữ của câu hỏi).
+  - `lib/chatbot-config.ts`: type `ChatMessage`, giới hạn (độ dài, số lần retry), lời chào và thông điệp lỗi song ngữ Việt/Anh. Server chỉ trả **mã lỗi** (`rate_limited`, `upstream_busy`, ...), widget tra thông điệp ở đây.
+  - `lib/rate-limit.ts`: limiter in-memory (mặc định 10 req/phút/IP + 12 req/phút toàn site, vì gói free Gemini chỉ cho 15 req/phút/model, chỉnh bằng env `CHAT_RATE_LIMIT_PER_MIN`, `CHAT_GLOBAL_RATE_LIMIT_PER_MIN`). Trên serverless mỗi instance có bộ nhớ riêng nên chỉ gần đúng; IP lấy từ `x-forwarded-for`.
+  - `route.ts` chuẩn hoá lịch sử do client gửi (cắt độ dài, gộp lượt trùng vai, bắt đầu/kết thúc bằng lượt user). Client gửi cả lượt bot nên về nguyên tắc có thể bị giả mạo — chấp nhận được vì user vốn tự gõ được mọi thứ; muốn chặt hơn phải lưu hội thoại phía server (Tuần 3).
+  - Ngôn ngữ: model phải khai báo `user_language` trước rồi mới viết `reply` (structured output JSON), nhờ vậy trả lời đúng ngôn ngữ người dùng mà không cần dò ngôn ngữ trong code. Tiếng Anh/Việt ổn định; tiếng Nhật/Hàn với model lite còn sai. Bị lỗi 429/503 từ Google thì route trả `upstream_busy` (503 được retry tối đa 3 lần).
+  - `temperature: 0` và `ThinkingLevel.MINIMAL` (chỉnh qua `GEMINI_THINKING_LEVEL`) để trả lời nhanh (~1s); không phải model nào cũng hỗ trợ `MINIMAL` (`gemini-3.8-flash` từ chối).
+- **Nút Duyệt/Từ chối** ở `/admin/requests` mới chỉ là UI, chưa có handler.
+
+## UI conventions
+
+- **shadcn/ui style `base-nova` trên nền Base UI** (`@base-ui/react`, không phải Radix) — cấu hình ở `components.json`. Thêm component mới bằng CLI `npx shadcn add <name>` vào `components/ui/`; API của Base UI khác Radix: dùng prop `render={<Link .../>}` thay cho `asChild` (xem `landing/hero.tsx`).
+- Icon dùng `lucide-react`; animation dùng `motion`; class merge qua `cn()` trong `lib/utils.ts`.
+- **Theme/Tailwind v4:** không có `tailwind.config`; token màu và radius khai báo trong `app/globals.css` (`@theme inline` + CSS variables dạng oklch). Có block `.dark` nhưng UI landing/admin được thiết kế cho light theme.
+- Ảnh remote chỉ cho phép host `images.unsplash.com` (`next.config.ts`); host khác phải thêm vào `remotePatterns`.
+- Định dạng tiền VND dùng `toLocaleString("vi-VN") + "₫"` (helper `formatVnd` hiện được định nghĩa lặp trong `admin/requests/page.tsx` và `landing/quote-form.tsx`).
