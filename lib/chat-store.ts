@@ -113,3 +113,89 @@ export async function appendTurn(
   if (error) throw new StorageError("append messages", error);
   return (data as MessageRow[]).sort((a, b) => a.id - b.id).map(toStoredMessage);
 }
+
+// ---- Dành cho trang admin (xem hội thoại thật của khách) ----
+// Các hàm dưới đây KHÔNG tự kiểm tra quyền: nơi gọi phải gọi `requireAdmin()` (lib/admin-guard.ts) trước.
+
+export const ADMIN_PAGE_SIZE = 20;
+const ADMIN_MAX_MESSAGES = 2000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface AdminConversationSummary {
+  id: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messageCount: number;
+  firstUserMessage: string | null;
+}
+
+export interface AdminConversationDetail {
+  id: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messages: StoredMessage[];
+  /** true nếu cuộc trò chuyện dài hơn giới hạn hiển thị và đã bị cắt bớt. */
+  truncated: boolean;
+}
+
+interface SummaryRow {
+  id: string;
+  created_at: string;
+  last_message_at: string;
+  message_count: number | string;
+  first_user_message: string | null;
+}
+
+export async function listConversationsForAdmin(
+  page: number,
+): Promise<{ items: AdminConversationSummary[]; total: number }> {
+  const client = db();
+  const offset = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE;
+
+  const [{ data, error }, { count, error: countError }] = await Promise.all([
+    client.rpc("list_conversations_for_admin", { p_limit: ADMIN_PAGE_SIZE, p_offset: offset }),
+    client.from("conversations").select("id", { count: "exact", head: true }),
+  ]);
+  if (error) throw new StorageError("list conversations", error);
+  if (countError) throw new StorageError("count conversations", countError);
+
+  const items = ((data ?? []) as SummaryRow[]).map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    lastMessageAt: row.last_message_at,
+    messageCount: Number(row.message_count),
+    firstUserMessage: row.first_user_message,
+  }));
+  return { items, total: count ?? 0 };
+}
+
+/** Một cuộc trò chuyện kèm toàn bộ tin nhắn (cũ → mới); null nếu id không hợp lệ hoặc không tồn tại. */
+export async function getConversationForAdmin(id: string): Promise<AdminConversationDetail | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const client = db();
+
+  const { data: conversation, error } = await client
+    .from("conversations")
+    .select("id, created_at, last_message_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new StorageError("get conversation", error);
+  if (!conversation) return null;
+
+  const { data: rows, error: messagesError } = await client
+    .from("messages")
+    .select("id, role, content, created_at")
+    .eq("conversation_id", id)
+    .order("id", { ascending: true })
+    .limit(ADMIN_MAX_MESSAGES + 1);
+  if (messagesError) throw new StorageError("get conversation messages", messagesError);
+
+  const all = (rows ?? []) as MessageRow[];
+  return {
+    id: conversation.id,
+    createdAt: conversation.created_at,
+    lastMessageAt: conversation.last_message_at,
+    messages: all.slice(0, ADMIN_MAX_MESSAGES).map(toStoredMessage),
+    truncated: all.length > ADMIN_MAX_MESSAGES,
+  };
+}
