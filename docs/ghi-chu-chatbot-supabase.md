@@ -46,3 +46,10 @@ Project: `BT DLLT - Cong tiep nhan ho so` (`vftutmrvxacyykwlpqlc`, ap-northeast-
 - Các trang admin khác (requests, schools, profiles) vẫn dùng mock data và chưa có đăng nhập. Đã xoá dữ liệu giả `conversations` khỏi `lib/mock-data.ts`.
 - Đã kiểm thử: không đăng nhập / sai mật khẩu / sai user / request kiểu RSC đều 401; đúng mật khẩu 200; id sai hoặc không tồn tại 404; `page=abc|-5|999` không lỗi; kiểm tra giao diện bằng trình duyệt; dữ liệu test đã xoá (chỉ còn cuộc "hello" thật).
 - Khi bật đăng nhập: Basic Auth không có đăng xuất/phân quyền và không giới hạn số lần thử sai (proxy không chia sẻ bộ nhớ nên limiter in-memory không đáng tin ở đây) — dùng mật khẩu dài, ngẫu nhiên.
+
+## 7. Xoá cuộc trò chuyện (2026-10-11)
+- Nút "Xoá" ở danh sách và "Xoá cuộc trò chuyện" ở trang chi tiết, có bước xác nhận ("Xoá vĩnh viễn"/"Huỷ"). Xoá xong danh sách tự cập nhật; từ trang chi tiết thì quay về danh sách.
+- Cài bằng Server Action `deleteConversationAction` (`app/admin/conversations/actions.ts`) → `deleteConversationForAdmin` (`lib/chat-store.ts`). Xoá vĩnh viễn; tin nhắn xoá theo nhờ `on delete cascade` (đã kiểm tra: không còn tin nhắn mồ côi).
+- Quyền: `checkAdminWrite()` (`lib/admin-guard.ts`) chạy trong action (Server Action là endpoint công khai nên không dựa vào việc ẩn nút). Chưa đặt `ADMIN_PASSWORD` thì ai cũng xoá được (theo yêu cầu, chưa cần đăng nhập); đặt rồi thì phải đăng nhập (không/sai mật khẩu → 401).
+- Id sai hoặc không tồn tại → báo "Không tìm thấy cuộc trò chuyện", không lỗi. Khách đang mở chat trên trình duyệt: tin nhắn kế tiếp sẽ tạo cuộc trò chuyện mới (cuộc cũ đã mất).
+- **Rủi ro khi chưa bật đăng nhập:** ai biết URL `/admin/conversations` đều xoá được mọi hội thoại. Nên đặt `ADMIN_PASSWORD` trước khi có khách thật.

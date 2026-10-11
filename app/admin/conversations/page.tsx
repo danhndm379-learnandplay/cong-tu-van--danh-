@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DeleteConversationButton } from "@/components/admin/delete-conversation-button";
 import { requireAdmin } from "@/lib/admin-guard";
 import { ADMIN_PAGE_SIZE, listConversationsForAdmin } from "@/lib/chat-store";
 import { formatDateTime } from "@/lib/format";
@@ -74,12 +75,15 @@ export default async function AdminConversationsPage({
                       {conv.firstUserMessage ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        nativeButton={false}
-                        render={<Link href={`/admin/conversations/${conv.id}`}>Xem</Link>}
-                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          nativeButton={false}
+                          render={<Link href={`/admin/conversations/${conv.id}`}>Xem</Link>}
+                        />
+                        <DeleteConversationButton id={conv.id} compact />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

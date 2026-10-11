@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DeleteConversationButton } from "@/components/admin/delete-conversation-button";
 import { requireAdmin } from "@/lib/admin-guard";
 import { getConversationForAdmin } from "@/lib/chat-store";
 import { formatDateTime } from "@/lib/format";
@@ -37,6 +38,7 @@ export default async function AdminConversationDetailPage({
       <AdminPageHeader
         title="Chi tiết cuộc trò chuyện"
         description={`Bắt đầu ${formatDateTime(conversation.createdAt)} · Hoạt động gần nhất ${formatDateTime(conversation.lastMessageAt)} · ${conversation.messages.length} tin nhắn`}
+        action={<DeleteConversationButton id={conversation.id} redirectTo="/admin/conversations" />}
       />
 
       <Card className="p-4 sm:p-6">

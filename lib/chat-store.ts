@@ -199,3 +199,14 @@ export async function getConversationForAdmin(id: string): Promise<AdminConversa
     truncated: all.length > ADMIN_MAX_MESSAGES,
   };
 }
+
+/**
+ * Xoá VĨNH VIỄN một cuộc trò chuyện cùng toàn bộ tin nhắn (tin nhắn bị xoá theo qua `on delete cascade`).
+ * Trả về false nếu id không hợp lệ hoặc không tồn tại. Nơi gọi phải kiểm tra quyền ghi (`checkAdminWrite()`) trước.
+ */
+export async function deleteConversationForAdmin(id: string): Promise<boolean> {
+  if (!UUID_PATTERN.test(id)) return false;
+  const { data, error } = await db().from("conversations").delete().eq("id", id).select("id");
+  if (error) throw new StorageError("delete conversation", error);
+  return (data?.length ?? 0) > 0;
+}
