@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@supabase/server/core";
 import { chatLimits, type StoredMessage } from "@/lib/chatbot-config";
+import type { LeadQuality, LeadQualityFilter } from "@/lib/lead-sanitize";
 
 // Lưu lịch sử chat vào Supabase. Hai bảng `conversations` và `messages` là dữ liệu riêng tư:
 // RLS bật, anon/authenticated không có quyền gì, chỉ secret key (service_role) trên server truy cập được.
@@ -42,6 +43,9 @@ function db() {
     throw new StorageError("create client (thiếu SUPABASE_URL hoặc SUPABASE_SECRET_KEY?)", err);
   }
 }
+
+/** Client admin (bỏ qua RLS) dùng chung cho các module lưu trữ phía server khác (vd. lead-store). */
+export { db as adminDb };
 
 interface MessageRow {
   id: number;
@@ -127,6 +131,8 @@ export interface AdminConversationSummary {
   lastMessageAt: string;
   messageCount: number;
   firstUserMessage: string | null;
+  /** Chất lượng lead đã trích xuất; null nếu cuộc trò chuyện chưa trích xuất lead. */
+  leadQuality: LeadQuality | null;
 }
 
 export interface AdminConversationDetail {
@@ -144,17 +150,27 @@ interface SummaryRow {
   last_message_at: string;
   message_count: number | string;
   first_user_message: string | null;
+  lead_quality: LeadQuality | null;
 }
 
+/**
+ * Danh sách hội thoại (mới nhất trước), có phân trang. `quality`: lọc theo chất lượng lead
+ * ("good" | "ok" | "spam") hoặc "none" = chưa trích xuất lead; bỏ trống = tất cả.
+ */
 export async function listConversationsForAdmin(
   page: number,
+  quality: LeadQualityFilter | null = null,
 ): Promise<{ items: AdminConversationSummary[]; total: number }> {
   const client = db();
   const offset = (Math.max(1, page) - 1) * ADMIN_PAGE_SIZE;
 
-  const [{ data, error }, { count, error: countError }] = await Promise.all([
-    client.rpc("list_conversations_for_admin", { p_limit: ADMIN_PAGE_SIZE, p_offset: offset }),
-    client.from("conversations").select("id", { count: "exact", head: true }),
+  const [{ data, error }, { data: total, error: countError }] = await Promise.all([
+    client.rpc("list_conversations_for_admin", {
+      p_limit: ADMIN_PAGE_SIZE,
+      p_offset: offset,
+      p_quality: quality,
+    }),
+    client.rpc("count_conversations_for_admin", { p_quality: quality }),
   ]);
   if (error) throw new StorageError("list conversations", error);
   if (countError) throw new StorageError("count conversations", countError);
@@ -165,8 +181,9 @@ export async function listConversationsForAdmin(
     lastMessageAt: row.last_message_at,
     messageCount: Number(row.message_count),
     firstUserMessage: row.first_user_message,
+    leadQuality: row.lead_quality,
   }));
-  return { items, total: count ?? 0 };
+  return { items, total: Number(total ?? 0) };
 }
 
 /** Một cuộc trò chuyện kèm toàn bộ tin nhắn (cũ → mới); null nếu id không hợp lệ hoặc không tồn tại. */

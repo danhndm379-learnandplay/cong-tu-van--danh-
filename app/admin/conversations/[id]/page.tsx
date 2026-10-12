@@ -5,9 +5,11 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DeleteConversationButton } from "@/components/admin/delete-conversation-button";
+import { LeadCard } from "@/components/admin/lead-card";
 import { requireAdmin } from "@/lib/admin-guard";
 import { getConversationForAdmin } from "@/lib/chat-store";
 import { formatDateTime } from "@/lib/format";
+import { getLeadForAdmin, type StoredLead } from "@/lib/lead-store";
 import { cn } from "@/lib/utils";
 
 export default async function AdminConversationDetailPage({
@@ -32,6 +34,15 @@ export default async function AdminConversationDetailPage({
   }
   if (!conversation) notFound();
 
+  let lead: StoredLead | null = null;
+  let leadLoadFailed = false;
+  try {
+    lead = await getLeadForAdmin(conversation.id);
+  } catch (err) {
+    console.error("[admin/conversations/[id]] Không tải được lead:", err);
+    leadLoadFailed = true;
+  }
+
   return (
     <>
       <BackButton />
@@ -39,6 +50,13 @@ export default async function AdminConversationDetailPage({
         title="Chi tiết cuộc trò chuyện"
         description={`Bắt đầu ${formatDateTime(conversation.createdAt)} · Hoạt động gần nhất ${formatDateTime(conversation.lastMessageAt)} · ${conversation.messages.length} tin nhắn`}
         action={<DeleteConversationButton id={conversation.id} redirectTo="/admin/conversations" />}
+      />
+
+      <LeadCard
+        conversationId={conversation.id}
+        lead={lead}
+        latestMessageId={conversation.messages.at(-1)?.id ?? null}
+        loadFailed={leadLoadFailed}
       />
 
       <Card className="p-4 sm:p-6">
