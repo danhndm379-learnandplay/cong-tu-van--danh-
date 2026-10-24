@@ -43,15 +43,47 @@ export function QuoteForm() {
   const [country, setCountry] = React.useState<string>("");
   const [degreeLevel, setDegreeLevel] = React.useState<string>("dai_hoc");
   const [selectedPackage, setSelectedPackage] = React.useState<ServicePackage>("co_ban");
+  const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
-  const [phone, setPhone] = React.useState("");
-  const [submitted, setSubmitted] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  // Mức giá lấy từ phản hồi của server (server tự tính theo gói), không dùng giá ở trình duyệt.
+  const [quoted, setQuoted] = React.useState<{ price: number; packageName: string } | null>(null);
 
-  const chosenPackage = servicePackages.find((p) => p.id === selectedPackage)!;
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+    if (!country) {
+      setError("Vui lòng chọn quốc gia muốn du học.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    setQuoted(null);
+    try {
+      const res = await fetch("/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: name,
+          email,
+          studyCountry: country,
+          educationLevel: degreeLevel,
+          servicePackage: selectedPackage,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        setError(data?.message ?? "Chưa gửi được yêu cầu, bạn thử lại sau ít phút.");
+        return;
+      }
+      const pkg = servicePackages.find((p) => p.id === data.servicePackage);
+      setQuoted({ price: data.price, packageName: pkg?.name ?? "" });
+    } catch {
+      setError("Không kết nối được tới hệ thống, vui lòng kiểm tra mạng và thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -153,44 +185,53 @@ export function QuoteForm() {
 
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">
+                <Label htmlFor="name">Họ và tên</Label>
+                <Input
+                  id="name"
+                  required
+                  maxLength={200}
+                  autoComplete="name"
+                  placeholder="Nguyễn Văn A"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="email">Email liên hệ</Label>
                 <Input
                   id="email"
                   type="email"
                   required
+                  maxLength={320}
+                  autoComplete="email"
                   placeholder="ban@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Số điện thoại</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  required
-                  placeholder="09xx xxx xxx"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
             </div>
 
-            <Button type="submit" size="lg" className="w-full sm:w-auto">
-              Nhận báo giá
+            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={submitting}>
+              {submitting ? "Đang gửi..." : "Nhận báo giá"}
             </Button>
 
-            {submitted && (
-              <div className="space-y-3 rounded-xl border border-primary/20 bg-accent p-5">
-                <p className="text-sm text-muted-foreground">Mức giá dự kiến cho bạn</p>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            {quoted && (
+              <div role="status" className="space-y-3 rounded-xl border border-primary/20 bg-accent p-5">
+                <p className="text-sm text-muted-foreground">
+                  Mức giá dự kiến cho bạn{quoted.packageName ? ` (gói ${quoted.packageName})` : ""}
+                </p>
                 <p className="text-3xl font-semibold tracking-tight text-accent-foreground">
-                  {formatVnd(chosenPackage.price)}
+                  {formatVnd(quoted.price)}
                 </p>
                 <div className="flex items-start gap-2 text-sm text-accent-foreground">
                   <Mail className="mt-0.5 size-4 shrink-0" />
-                  <span>
-                    Báo giá đã được gửi qua email, đội ngũ sẽ liên hệ trong 24h.
-                  </span>
+                  <span>Yêu cầu của bạn đã được ghi nhận, đội ngũ sẽ liên hệ qua email trong 24h.</span>
                 </div>
               </div>
             )}

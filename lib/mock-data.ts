@@ -1,6 +1,8 @@
 // Toàn bộ dữ liệu trong file này là dữ liệu giả (mock), viết cứng để dựng UI.
 // Học viên sẽ thay thế bằng dữ liệu thật từ Supabase ở các tuần sau.
 
+import { QUOTE_PRICES } from "@/lib/quote";
+
 export type DocStatus = "chua_nop" | "dang_xu_ly" | "hop_le" | "can_nop_lai";
 
 export type RequestStatus = "cho_duyet" | "da_duyet" | "tu_choi";
@@ -38,7 +40,7 @@ export const servicePackages: ServiceOption[] = [
   {
     id: "co_ban",
     name: "Cơ bản",
-    price: 18_000_000,
+    price: QUOTE_PRICES.co_ban,
     description: "Phù hợp nếu hồ sơ của bạn đơn giản và đã chuẩn bị sẵn phần lớn giấy tờ.",
     benefits: [
       "Đối chiếu điểm chuẩn tự động",
@@ -50,7 +52,7 @@ export const servicePackages: ServiceOption[] = [
   {
     id: "toan_dien",
     name: "Toàn diện",
-    price: 45_000_000,
+    price: QUOTE_PRICES.toan_dien,
     description: "Đồng hành trọn gói từ tư vấn trường đến nộp hồ sơ.",
     benefits: [
       "Toàn bộ quyền lợi gói Cơ bản",
@@ -76,7 +78,7 @@ export const admissionRequests: AdmissionRequest[] = [
     id: "req_2101",
     customerName: "Trần Thị Bích",
     package: "toan_dien",
-    quote: 45_000_000,
+    quote: QUOTE_PRICES.toan_dien,
     status: "cho_duyet",
     createdAt: "2026-08-06 08:20",
   },
@@ -84,7 +86,7 @@ export const admissionRequests: AdmissionRequest[] = [
     id: "req_2100",
     customerName: "Đỗ Ngọc Lan",
     package: "toan_dien",
-    quote: 45_000_000,
+    quote: QUOTE_PRICES.toan_dien,
     status: "cho_duyet",
     createdAt: "2026-08-05 09:12",
   },
@@ -92,7 +94,7 @@ export const admissionRequests: AdmissionRequest[] = [
     id: "req_2099",
     customerName: "Lê Văn Hùng",
     package: "co_ban",
-    quote: 18_000_000,
+    quote: QUOTE_PRICES.co_ban,
     status: "da_duyet",
     createdAt: "2026-08-04 14:30",
   },
@@ -100,7 +102,7 @@ export const admissionRequests: AdmissionRequest[] = [
     id: "req_2098",
     customerName: "Phạm Thu Hà",
     package: "toan_dien",
-    quote: 45_000_000,
+    quote: QUOTE_PRICES.toan_dien,
     status: "da_duyet",
     createdAt: "2026-08-03 10:05",
   },
@@ -108,7 +110,7 @@ export const admissionRequests: AdmissionRequest[] = [
     id: "req_2097",
     customerName: "Nguyễn Đức Anh",
     package: "co_ban",
-    quote: 18_000_000,
+    quote: QUOTE_PRICES.co_ban,
     status: "tu_choi",
     createdAt: "2026-08-02 16:47",
   },
