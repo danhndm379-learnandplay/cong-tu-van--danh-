@@ -23,6 +23,10 @@ interface UploadResponse {
   message?: string;
 }
 
+function tooLargeMessage(bytes: number) {
+  return `File quá lớn (${(bytes / (1024 * 1024)).toFixed(1)} MB), tối đa ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB. Hãy nén PDF hoặc chụp ảnh ở độ phân giải thấp hơn rồi nộp lại.`;
+}
+
 /** Thẻ nộp một loại giấy tờ: chọn file → gửi lên server → server cho Gemini đọc → trang tải lại với kết quả. */
 export function DocumentUploadCard({
   type,
@@ -50,9 +54,7 @@ export function DocumentUploadCard({
 
     setError(null);
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError(
-        `File quá lớn (${(file.size / (1024 * 1024)).toFixed(1)} MB), tối đa ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB. Hãy nén PDF hoặc chụp ảnh ở độ phân giải thấp hơn rồi nộp lại.`,
-      );
+      setError(tooLargeMessage(file.size));
       return;
     }
 
@@ -62,9 +64,19 @@ export function DocumentUploadCard({
       form.set("type", type);
       form.set("file", file);
       const res = await fetch("/api/portal/documents", { method: "POST", body: form });
-      const data = (await res.json()) as UploadResponse;
-      if (!res.ok || !data.ok) {
-        setError(data.message ?? "Không nộp được file, bạn thử lại sau.");
+      if (res.status === 413) {
+        // Vercel chặn body quá lớn bằng phản hồi dạng chữ (không phải JSON) trước khi tới server của ta.
+        setError(tooLargeMessage(file.size));
+        return;
+      }
+      let data: UploadResponse | null = null;
+      try {
+        data = (await res.json()) as UploadResponse;
+      } catch {
+        data = null; // phản hồi không phải JSON
+      }
+      if (!res.ok || !data?.ok) {
+        setError(data?.message ?? "Không nộp được file (hệ thống trả về phản hồi không đọc được), bạn thử lại sau.");
         return;
       }
       router.refresh(); // tải lại dữ liệu hồ sơ từ server: trạng thái, lý do, thông tin trích xuất, đối chiếu điểm chuẩn
