@@ -24,43 +24,7 @@ export const countries = [
   "Nhật Bản",
 ] as const;
 
-export const schools: School[] = [
-  {
-    id: "sch_01",
-    name: "University of Toronto",
-    country: "Canada",
-    minGpa: 8.0,
-    minIelts: 6.5,
-  },
-  {
-    id: "sch_02",
-    name: "RMIT University",
-    country: "Úc",
-    minGpa: 7.0,
-    minIelts: 6.0,
-  },
-  {
-    id: "sch_03",
-    name: "University of Manchester",
-    country: "Anh",
-    minGpa: 7.5,
-    minIelts: 6.5,
-  },
-  {
-    id: "sch_04",
-    name: "Arizona State University",
-    country: "Mỹ",
-    minGpa: 6.5,
-    minIelts: 6.0,
-  },
-  {
-    id: "sch_05",
-    name: "Yonsei University",
-    country: "Hàn Quốc",
-    minGpa: 8.5,
-    minIelts: 7.0,
-  },
-];
+// Danh sách trường tham chiếu giờ nằm ở bảng `schools` trên Supabase (đọc qua lib/school-store.ts).
 
 export interface ServiceOption {
   id: ServicePackage;
@@ -212,33 +176,4 @@ export const studentProfiles: StudentProfile[] = [
   },
 ];
 
-// Hồ sơ của học viên đang đăng nhập demo tại /portal
-export const currentStudent = {
-  name: "Nguyễn Minh Anh",
-  email: "minhanh.nguyen@example.com",
-  documents: {
-    transcript: {
-      status: "hop_le" as DocStatus,
-      fileName: "bang-diem-minh-anh.pdf",
-    },
-    ielts: {
-      status: "dang_xu_ly" as DocStatus,
-      fileName: "ielts-certificate.jpg",
-    },
-    identity: {
-      status: "can_nop_lai" as DocStatus,
-      fileName: "cccd-mat-truoc.jpg",
-      reason: "Ảnh mờ, không đọc rõ thông tin",
-    },
-  },
-  extracted: {
-    fullName: "Nguyễn Minh Anh",
-    dateOfBirth: "12/05/2005",
-    gpa: 8.2,
-    ielts: 6.5,
-  },
-  matches: [
-    { school: schools[0], passed: true },
-    { school: schools[4], passed: false },
-  ],
-};
+// Hồ sơ học viên thật giờ nằm ở bảng `student_profiles`/`student_documents` (đọc qua lib/student-store.ts).

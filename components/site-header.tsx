@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 const menuItems = [
   { name: "Trang chủ", href: "/" },
-  { name: "Điểm chuẩn trường", href: "#" },
+  { name: "Điểm chuẩn trường", href: "/schools" },
   { name: "Cổng hồ sơ", href: "/portal" },
   { name: "Admin", href: "/admin" },
 ];

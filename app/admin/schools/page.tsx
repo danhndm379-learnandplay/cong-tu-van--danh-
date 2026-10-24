@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { schools } from "@/lib/mock-data";
+import { formatScore } from "@/lib/format";
+import { listSchools } from "@/lib/school-store";
 
-export default function AdminSchoolsPage() {
+export default async function AdminSchoolsPage() {
+  // Đọc dữ liệu thật từ Supabase mỗi lần xem (không prerender lúc build, để sửa dữ liệu trong DB là thấy ngay).
+  await connection();
+
+  let schools: Awaited<ReturnType<typeof listSchools>> | null = null;
+  try {
+    schools = await listSchools();
+  } catch (err) {
+    console.error("[admin/schools] Không tải được danh sách trường:", err);
+  }
+
   return (
     <>
       <AdminPageHeader
@@ -26,6 +38,13 @@ export default function AdminSchoolsPage() {
         }
       />
 
+      {!schools ? (
+        <Card className="p-6 text-sm text-muted-foreground">
+          Không tải được danh sách trường từ database. Kiểm tra biến SUPABASE_URL và SUPABASE_PUBLISHABLE_KEY rồi thử lại.
+        </Card>
+      ) : schools.length === 0 ? (
+        <Card className="p-6 text-sm text-muted-foreground">Chưa có trường tham chiếu nào.</Card>
+      ) : (
       <Card>
         <Table>
           <TableHeader>
@@ -42,8 +61,8 @@ export default function AdminSchoolsPage() {
               <TableRow key={school.id}>
                 <TableCell className="font-medium">{school.name}</TableCell>
                 <TableCell>{school.country}</TableCell>
-                <TableCell>{school.minGpa.toFixed(1)}</TableCell>
-                <TableCell>{school.minIelts.toFixed(1)}</TableCell>
+                <TableCell>{formatScore(school.minGpa)}</TableCell>
+                <TableCell>{formatScore(school.minIelts)}</TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-2">
                     <Button size="icon-sm" variant="outline" aria-label="Sửa">
@@ -59,6 +78,7 @@ export default function AdminSchoolsPage() {
           </TableBody>
         </Table>
       </Card>
+      )}
     </>
   );
 }

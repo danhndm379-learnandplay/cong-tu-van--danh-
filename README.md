@@ -1,7 +1,8 @@
 # DuHoc24 - Website mẫu "Cổng Tiếp Nhận Hồ Sơ Du Học"
 
-Repo mẫu dùng cho khoá lập trình 6 tuần. Bản này (Tuần 1) chỉ dựng UI, toàn bộ dữ liệu là **mock data viết cứng** trong [`lib/mock-data.ts`](lib/mock-data.ts),
-chưa nối API hay database thật.
+Repo mẫu dùng cho khoá lập trình 6 tuần. Bản hiện tại đã nối Gemini và Supabase: chatbot lưu hội thoại, trích xuất lead, điểm chuẩn và học bổng đọc từ database,
+cổng hồ sơ học viên đọc giấy tờ bằng AI. Một số trang admin (`requests`, `profiles`) và form báo giá vẫn dùng **mock data** trong [`lib/mock-data.ts`](lib/mock-data.ts).
+Chi tiết kiến trúc xem [`CLAUDE.md`](CLAUDE.md) và thư mục [`docs/`](docs/).
 
 ## Bắt đầu
 
@@ -10,19 +11,20 @@ npm install
 npm run dev
 ```
 
-Mở [http://localhost:3000](http://localhost:3000).
+Mở [http://localhost:3000](http://localhost:3000). Chạy test logic: `npm test`. Biến môi trường cần thiết xem [`.env.example`](.env.example).
 
 ## Các route
 
 | Route | Mô tả |
 |---|---|
-| `/` | Landing page: hero, form báo giá, chatbot QnA (UI tĩnh), 3 điểm nổi bật, footer |
-| `/portal` | Cổng hồ sơ học viên: upload giấy tờ, thông tin trích xuất, đối chiếu điểm chuẩn |
+| `/` | Landing page: hero, form báo giá, chatbot tư vấn (Gemini, lưu hội thoại vào Supabase), 3 điểm nổi bật, footer |
+| `/schools` | Trang công khai: điểm chuẩn các trường và học bổng (đọc từ Supabase) |
+| `/portal` | Cổng hồ sơ học viên: upload bảng điểm (PDF), ảnh IELTS, ảnh CMND/hộ chiếu → Gemini đọc → kiểm tra đủ/thiếu → đối chiếu điểm chuẩn → AI gợi ý học bổng |
 | `/admin` | Chuyển hướng đến `/admin/requests` |
 | `/admin/requests` | Danh sách yêu cầu báo giá |
-| `/admin/schools` | Danh sách trường tham chiếu (điểm chuẩn) |
+| `/admin/schools` | Danh sách trường tham chiếu (điểm chuẩn), đọc từ Supabase |
 | `/admin/profiles` | Hồ sơ học viên và trạng thái giấy tờ |
-| `/admin/conversations` | Lịch sử hội thoại chatbot |
+| `/admin/conversations` | Lịch sử hội thoại chatbot thật, xem chi tiết, xoá, trích xuất lead, lọc theo chất lượng, xuất CSV |
 
 Trang `/login` chưa được dựng ở bước này. Học viên sẽ tự dựng ở Tuần 6.
 
