@@ -1,17 +1,9 @@
-import { cookies } from "next/headers";
 import { clientIp } from "@/lib/client-ip";
 import { DocExtractionError, extractDocument } from "@/lib/document-extraction";
 import { DOC_SHORT_NAMES, DOC_TYPES, evaluateDocument, type DocType } from "@/lib/portal-docs";
 import { checkRateLimit } from "@/lib/rate-limit";
-import {
-  getOrCreateStudentProfile,
-  hashStudentToken,
-  isValidStudentToken,
-  newStudentToken,
-  saveStudentDocument,
-  STUDENT_COOKIE,
-  STUDENT_COOKIE_MAX_AGE,
-} from "@/lib/student-store";
+import { getOrCreateStudentProfile, saveStudentDocument } from "@/lib/student-store";
+import { getCurrentUser } from "@/lib/supabase-auth";
 import { checkUpload, MAX_UPLOAD_BYTES } from "@/lib/upload-validation";
 
 // Nhận MỘT giấy tờ của học viên (multipart: `type` + `file`), kiểm tra, cho Gemini đọc, lưu thông tin trích xuất vào hồ sơ.
@@ -27,6 +19,10 @@ function fail(error: string, message: string, status: number, headers?: HeadersI
 }
 
 export async function POST(request: Request) {
+  // Phải đăng nhập: hồ sơ gắn với tài khoản. `user.id` lấy từ phiên đã được Supabase xác thực, không bao giờ từ dữ liệu client gửi.
+  const user = await getCurrentUser();
+  if (!user) return fail("unauthorized", "Bạn cần đăng nhập để nộp giấy tờ. Vui lòng đăng nhập rồi nộp lại.", 401);
+
   const ip = clientIp(request);
   const perIp = checkRateLimit(`doc-ip:${ip}`, UPLOAD_LIMIT_PER_IP);
   const limited = perIp.ok ? checkRateLimit("doc-global", UPLOAD_LIMIT_GLOBAL) : perIp;
@@ -87,12 +83,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const cookieStore = await cookies();
-  const existing = cookieStore.get(STUDENT_COOKIE)?.value;
-  const token = isValidStudentToken(existing) ? existing : newStudentToken();
-
   try {
-    const profileId = await getOrCreateStudentProfile(hashStudentToken(token));
+    const profileId = await getOrCreateStudentProfile(user.id);
     await saveStudentDocument(
       profileId,
       type,
@@ -104,14 +96,6 @@ export async function POST(request: Request) {
     console.error("[api/portal/documents] Lưu hồ sơ thất bại:", err);
     return fail("storage_error", "Đã đọc xong nhưng chưa lưu được vào hồ sơ, bạn thử nộp lại.", 500);
   }
-
-  cookieStore.set(STUDENT_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: STUDENT_COOKIE_MAX_AGE,
-  });
 
   const evaluation = evaluateDocument(type, extraction.fields);
   return Response.json(

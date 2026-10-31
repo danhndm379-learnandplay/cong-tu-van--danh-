@@ -1,17 +1,16 @@
 import "server-only";
 
-import { adminDb, hashVisitorToken, isValidVisitorToken, newVisitorToken, StorageError } from "@/lib/chat-store";
+import { adminDb, StorageError } from "@/lib/chat-store";
 import { DOC_TYPES, EMPTY_FIELDS, type DocFields, type DocType } from "@/lib/portal-docs";
+import { createAuthClient } from "@/lib/supabase-auth";
 
 // Hồ sơ học viên (bảng `student_profiles` + `student_documents`): DỮ LIỆU RIÊNG TƯ có PII (họ tên, ngày sinh, số giấy tờ).
-// RLS bật, anon/authenticated bị chặn hoàn toàn; chỉ truy cập từ server bằng secret key qua `adminDb()`.
-// Học viên được nhận diện bằng cookie httpOnly (chưa có đăng nhập, sẽ thay bằng Supabase Auth ở Tuần 6); DB chỉ lưu sha256 của token.
+// Mỗi hồ sơ thuộc về MỘT tài khoản đăng nhập (`user_id`) và được bảo vệ bằng RLS ở Postgres:
+//  - ĐỌC: bằng phiên của chính người dùng (`createAuthClient`, role `authenticated`). RLS chỉ trả về hàng của họ, nên dù code có lỡ
+//    truy vấn id của người khác thì database cũng không trả gì.
+//  - GHI: chỉ từ server bằng secret key (`adminDb`, bỏ qua RLS) vì dữ liệu do AI trích xuất từ giấy tờ, người dùng không được tự sửa
+//    điểm số. Các hàm ghi nhận `userId` đã được xác thực từ phiên đăng nhập, không bao giờ lấy từ dữ liệu client gửi.
 // File gốc KHÔNG được lưu, chỉ lưu thông tin đã trích xuất và siêu dữ liệu file.
-
-export const STUDENT_COOKIE = "duhoc24_student";
-export const STUDENT_COOKIE_MAX_AGE = 60 * 60 * 24 * 90;
-
-export { hashVisitorToken as hashStudentToken, isValidVisitorToken as isValidStudentToken, newVisitorToken as newStudentToken };
 
 export interface StoredStudentDoc {
   type: DocType;
@@ -79,16 +78,18 @@ export interface StudentSnapshot {
   scholarship: { suggestions: unknown; inputHash: string | null; generatedAt: string | null } | null;
 }
 
-/** Hồ sơ + giấy tờ của học viên đang giữ cookie này; rỗng nếu chưa có cookie hoặc chưa nộp gì. */
-export async function loadStudentSnapshot(token: string | undefined): Promise<StudentSnapshot> {
+/**
+ * Hồ sơ + giấy tờ của người dùng `userId` (đã xác thực), đọc bằng phiên của chính họ để RLS lọc; rỗng nếu chưa nộp gì.
+ * `.eq("user_id", userId)` là lớp bảo vệ thứ hai, RLS ở database mới là lớp quyết định.
+ */
+export async function loadStudentSnapshot(userId: string): Promise<StudentSnapshot> {
   const empty: StudentSnapshot = { profileId: null, documents: {}, scholarship: null };
-  if (!isValidVisitorToken(token)) return empty;
 
-  const db = adminDb();
+  const db = await createAuthClient();
   const { data: profile, error } = await db
     .from("student_profiles")
     .select("id, scholarship_suggestions, scholarship_input_hash, scholarship_generated_at")
-    .eq("owner_token_hash", hashVisitorToken(token))
+    .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new StorageError("load student profile", error);
   if (!profile) return empty;
@@ -114,24 +115,26 @@ export async function loadStudentSnapshot(token: string | undefined): Promise<St
   };
 }
 
-/** Tìm hồ sơ theo hash token, tạo mới nếu chưa có. Trả về id hồ sơ. */
-export async function getOrCreateStudentProfile(tokenHash: string): Promise<string> {
+/** Tìm hồ sơ của tài khoản `userId`, tạo mới nếu chưa có (mỗi tài khoản một hồ sơ). Trả về id hồ sơ. */
+export async function getOrCreateStudentProfile(userId: string): Promise<string> {
   const db = adminDb();
-  const { data: existing, error } = await db
-    .from("student_profiles")
-    .select("id")
-    .eq("owner_token_hash", tokenHash)
-    .maybeSingle();
-  if (error) throw new StorageError("find student profile", error);
-  if (existing) return existing.id;
+  const find = async () => {
+    const { data, error } = await db.from("student_profiles").select("id").eq("user_id", userId).maybeSingle();
+    if (error) throw new StorageError("find student profile", error);
+    return data?.id as string | undefined;
+  };
 
-  const { data, error: insertError } = await db
-    .from("student_profiles")
-    .insert({ owner_token_hash: tokenHash })
-    .select("id")
-    .single();
-  if (insertError) throw new StorageError("create student profile", insertError);
-  return data.id;
+  const existing = await find();
+  if (existing) return existing;
+
+  const { data, error: insertError } = await db.from("student_profiles").insert({ user_id: userId }).select("id").single();
+  if (!insertError) return data.id;
+  // Hai yêu cầu nộp cùng lúc: yêu cầu kia đã tạo hồ sơ trước (vi phạm unique user_id), lấy hồ sơ đó.
+  if (insertError.code === "23505") {
+    const raced = await find();
+    if (raced) return raced;
+  }
+  throw new StorageError("create student profile", insertError);
 }
 
 /** Lưu (ghi đè) thông tin trích xuất của một loại giấy tờ. Giấy tờ mới thay thế giấy tờ cũ cùng loại. */
@@ -183,7 +186,7 @@ export async function saveStudentDocument(
 }
 
 /** Lưu đệm gợi ý học bổng của AI cùng dấu vân tay đầu vào (để biết khi nào cần tạo lại). */
-export async function saveScholarshipSuggestions(profileId: string, suggestions: unknown, inputHash: string): Promise<void> {
+export async function saveScholarshipSuggestions(userId: string, profileId: string, suggestions: unknown, inputHash: string): Promise<void> {
   const { error } = await adminDb()
     .from("student_profiles")
     .update({
@@ -191,6 +194,7 @@ export async function saveScholarshipSuggestions(profileId: string, suggestions:
       scholarship_input_hash: inputHash,
       scholarship_generated_at: new Date().toISOString(),
     })
-    .eq("id", profileId);
+    .eq("id", profileId)
+    .eq("user_id", userId);
   if (error) throw new StorageError("save scholarship suggestions", error);
 }

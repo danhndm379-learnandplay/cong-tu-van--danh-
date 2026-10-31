@@ -1,9 +1,9 @@
-import { cookies } from "next/headers";
 import { clientIp } from "@/lib/client-ip";
 import { buildAdviceContext, computePortalResults } from "@/lib/portal-results";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { AdvisorError, adviseScholarships } from "@/lib/scholarship-advisor";
-import { loadStudentSnapshot, saveScholarshipSuggestions, STUDENT_COOKIE } from "@/lib/student-store";
+import { loadStudentSnapshot, saveScholarshipSuggestions } from "@/lib/student-store";
+import { getCurrentUser } from "@/lib/supabase-auth";
 
 // Gợi ý học bổng cho học viên bằng AI (function calling), dựa trên hồ sơ đã trích xuất và các trường học viên đạt yêu cầu.
 // Kết quả được lưu đệm trong hồ sơ; chỉ gọi AI lại khi hồ sơ, danh sách trường đạt hoặc dữ liệu học bổng thay đổi (hoặc `force`).
@@ -18,6 +18,9 @@ function fail(error: string, message: string, status: number, headers?: HeadersI
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return fail("unauthorized", "Bạn cần đăng nhập để xem gợi ý học bổng.", 401);
+
   let force = false;
   try {
     const body = await request.json();
@@ -27,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const snapshot = await loadStudentSnapshot((await cookies()).get(STUDENT_COOKIE)?.value);
+    const snapshot = await loadStudentSnapshot(user.id);
     if (!snapshot.profileId) return fail("no_profile", "Bạn chưa nộp giấy tờ nào.", 404);
 
     const results = await computePortalResults(snapshot);
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     const advice = await adviseScholarships(context.student, context.passed, context.scholarships);
-    await saveScholarshipSuggestions(snapshot.profileId, advice, context.inputHash);
+    await saveScholarshipSuggestions(user.id, snapshot.profileId, advice, context.inputHash);
     return Response.json({ ok: true, advice, cached: false }, { headers: NO_STORE });
   } catch (err) {
     if (err instanceof AdvisorError) {

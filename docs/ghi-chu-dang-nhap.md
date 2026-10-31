@@ -7,7 +7,7 @@ Cập nhật: 2026-10-31. Trang `/login`: người dùng nhập email, nhận m�
 2. Người dùng bấm link trong email → Supabase xác thực → chuyển về `/auth/callback` (`app/auth/callback/route.ts`) → đổi `code` (hoặc `token_hash`) thành phiên đăng nhập, ghi cookie rồi chuyển tới `/portal`.
 3. Phiên lưu trong cookie `sb-<project>-auth-token` (httpOnly, không đọc được bằng JavaScript). `proxy.ts` làm mới token trước khi `/portal` và `/login` render. Nút "Đăng xuất" ở đầu `/portal` (`signOutAction`).
 
-Đăng nhập chưa thay đổi quyền truy cập: `/portal` vẫn mở cho mọi người và hồ sơ học viên vẫn gắn với cookie `duhoc24_student` của trình duyệt (chưa gắn vào tài khoản đăng nhập). Việc đó là bước tiếp theo.
+**Cổng hồ sơ yêu cầu đăng nhập và hồ sơ gắn với tài khoản:** chưa đăng nhập mà vào `/portal` thì bị chuyển sang `/login`; mỗi tài khoản chỉ xem được hồ sơ của chính mình nhờ RLS ở database (xem mục 6).
 
 ## 2. Việc phải làm trong Supabase Dashboard (code không làm thay được)
 **Authentication → URL Configuration**
@@ -52,4 +52,11 @@ Lưu ý: link trong email mời là link chung tới trang đăng nhập; khách
 - `?next=` ở callback chỉ nhận đường dẫn nội bộ (`safeNextPath`), chặn open redirect.
 - Cookie phiên đặt `httpOnly` (và `secure` ở production).
 - Link trong email là dùng một lần; một số hệ thống quét thư có thể "bấm thử" trước và làm link hết hạn, khi đó nhập lại email để nhận link mới.
-- Chưa làm: gắn `student_profiles` vào tài khoản, bắt buộc đăng nhập để vào `/portal`, phân quyền admin bằng tài khoản (admin vẫn dùng `ADMIN_PASSWORD` tuỳ chọn).
+- Chưa làm: phân quyền admin bằng tài khoản (admin vẫn dùng `ADMIN_PASSWORD` tuỳ chọn); hạn chế ai được đăng nhập (hiện bất kỳ email nào cũng tạo được tài khoản).
+
+## 6. RLS cho hồ sơ học viên (mỗi người chỉ xem hồ sơ của mình)
+- Migration `20261031080000_student_profiles_row_level_security.sql`: thêm `student_profiles.user_id` (unique, xoá tài khoản thì hồ sơ và giấy tờ xoá theo), bỏ cột `owner_token_hash` cũ.
+- Policy: `anon` không có quyền; `authenticated` chỉ SELECT và chỉ hàng của mình (`user_id = (select auth.uid())`; giấy tờ thì kiểm tra hồ sơ chứa nó thuộc về mình). Không ai ngoài server (secret key) ghi được, kể cả vào hồ sơ của chính mình, để không ai tự sửa điểm số do AI đọc.
+- Trong code, hồ sơ được ĐỌC bằng phiên đăng nhập của người dùng (role `authenticated`) nên Postgres tự lọc; GHI bằng secret key với `userId` lấy từ phiên đã xác thực, không lấy từ dữ liệu client gửi.
+- Kiểm tra: `node scripts/check-rls.mjs` (chạy trên database thật, tạo rồi xoá 2 người dùng thử, không gửi email): đọc chéo hồ sơ và giấy tờ bằng đúng id đều rỗng, mọi thao tác ghi bị 403, chưa đăng nhập bị 401, các bảng riêng tư khác (`leads`, `conversations`, `messages`, `quote_requests`) vẫn bị chặn với người đã đăng nhập.
+- Lưu ý khi triển khai: migration đã xoá cột `owner_token_hash`, nên bản code cũ (dùng cookie) không đọc được hồ sơ nữa. Phải deploy code mới cùng lúc (hoặc ngay sau) khi áp dụng migration.

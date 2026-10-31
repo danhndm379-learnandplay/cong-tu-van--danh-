@@ -64,6 +64,10 @@ export function DocumentUploadCard({
       form.set("type", type);
       form.set("file", file);
       const res = await fetch("/api/portal/documents", { method: "POST", body: form });
+      if (res.status === 401) {
+        router.push("/login"); // hết phiên đăng nhập
+        return;
+      }
       if (res.status === 413) {
         // Vercel chặn body quá lớn bằng phản hồi dạng chữ (không phải JSON) trước khi tới server của ta.
         setError(tooLargeMessage(file.size));

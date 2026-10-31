@@ -6,15 +6,31 @@ import { authEnv, hasAuthSessionCookie, sessionCookieOptions } from "@/lib/auth-
 // Hai việc, chia theo đường dẫn:
 // 1) Trang admin có dữ liệu khách (hội thoại, yêu cầu báo giá): đăng nhập TUỲ CHỌN (HTTP Basic), chỉ bật khi đã đặt ADMIN_PASSWORD.
 //    Chưa đặt thì để mở (các trang admin dùng mock data cũng đang mở như vậy).
-// 2) Trang dùng phiên đăng nhập của người dùng (/portal, /login): làm mới token Supabase trước khi trang render, vì Server Component
-//    không ghi được cookie. Chỉ gọi Supabase khi trình duyệt đang có cookie phiên.
+// 2) Trang dùng phiên đăng nhập của người dùng:
+//    - /portal (cổng hồ sơ) BẮT BUỘC đăng nhập: chưa đăng nhập thì chuyển sang /login ngay tại đây;
+//    - /login: chỉ làm mới token Supabase trước khi trang render (Server Component không ghi được cookie).
+//    Chỉ gọi Supabase khi trình duyệt đang có cookie phiên. Trang và API vẫn tự kiểm tra lại (đây chỉ là lớp chặn sớm).
 function isAdminPath(pathname: string) {
   return pathname.startsWith("/admin/");
 }
 
-async function refreshUserSession(request: NextRequest) {
+function requiresLogin(pathname: string) {
+  return pathname === "/portal" || pathname.startsWith("/portal/");
+}
+
+function redirectToLogin(request: NextRequest, from?: NextResponse) {
+  const redirect = NextResponse.redirect(new URL("/login", request.url));
+  // Giữ lại cookie mà Supabase vừa xoá/làm mới (vd. phiên hết hạn) để trình duyệt dọn đúng.
+  from?.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
+}
+
+async function handleUserPages(request: NextRequest) {
+  const mustLogin = requiresLogin(request.nextUrl.pathname);
   const env = authEnv();
-  if (!env || !hasAuthSessionCookie(request.cookies.getAll().map((c) => c.name))) return NextResponse.next();
+  if (!env || !hasAuthSessionCookie(request.cookies.getAll().map((c) => c.name))) {
+    return mustLogin ? redirectToLogin(request) : NextResponse.next();
+  }
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(env.url, env.key, {
@@ -29,13 +45,14 @@ async function refreshUserSession(request: NextRequest) {
       },
     },
   });
-  // Gọi getUser() để Supabase xác thực và làm mới token nếu cần (cookie mới được ghi qua setAll ở trên).
-  await supabase.auth.getUser();
+  // getUser() nhờ máy chủ Supabase xác thực token (và làm mới nếu cần; cookie mới được ghi qua setAll ở trên).
+  const { data } = await supabase.auth.getUser();
+  if (mustLogin && !data.user) return redirectToLogin(request, response);
   return response;
 }
 
 export async function proxy(request: NextRequest) {
-  if (!isAdminPath(request.nextUrl.pathname)) return refreshUserSession(request);
+  if (!isAdminPath(request.nextUrl.pathname)) return handleUserPages(request);
 
   if (!isAdminAuthEnabled()) return NextResponse.next();
 
@@ -52,5 +69,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/conversations", "/admin/conversations/:path*", "/admin/requests", "/portal", "/login"],
+  matcher: ["/admin/conversations", "/admin/conversations/:path*", "/admin/requests", "/portal", "/portal/:path*", "/login"],
 };

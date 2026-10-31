@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { Lock } from "lucide-react";
 import { UserBar } from "@/components/auth/user-bar";
 import { SiteHeader } from "@/components/site-header";
@@ -12,7 +12,7 @@ import { ScholarshipPanel } from "@/components/portal/scholarship-panel";
 import { formatFileSize } from "@/lib/format";
 import { DOC_TYPES, type DocType } from "@/lib/portal-docs";
 import { buildAdviceContext, computePortalResults } from "@/lib/portal-results";
-import { loadStudentSnapshot, STUDENT_COOKIE } from "@/lib/student-store";
+import { loadStudentSnapshot } from "@/lib/student-store";
 import { getCurrentUser } from "@/lib/supabase-auth";
 
 // Trang riêng tư của học viên: không để công cụ tìm kiếm lập chỉ mục.
@@ -22,9 +22,10 @@ export const metadata: Metadata = {
 };
 
 export default async function PortalPage() {
-  // Đọc cookie nhận diện học viên nên trang luôn render theo từng người dùng (không prerender, không dùng chung bộ nhớ đệm).
-  const token = (await cookies()).get(STUDENT_COOKIE)?.value;
+  // Chưa đăng nhập thì không vào được cổng hồ sơ: chuyển sang trang đăng nhập (proxy.ts cũng chặn sớm; đây là lớp kiểm tra chính).
+  // Trang đọc phiên đăng nhập nên luôn render theo từng người dùng (không prerender, không dùng chung bộ nhớ đệm).
   const user = await getCurrentUser();
+  if (!user) redirect("/login");
 
   let loaded: {
     snapshot: Awaited<ReturnType<typeof loadStudentSnapshot>>;
@@ -32,7 +33,7 @@ export default async function PortalPage() {
     advice: Awaited<ReturnType<typeof buildAdviceContext>>;
   } | null = null;
   try {
-    const snapshot = await loadStudentSnapshot(token);
+    const snapshot = await loadStudentSnapshot(user.id);
     const results = await computePortalResults(snapshot);
     const advice = await buildAdviceContext(snapshot, results);
     loaded = { snapshot, results, advice };
@@ -78,7 +79,7 @@ export default async function PortalPage() {
             <Lock className="mt-0.5 size-3.5 shrink-0" />
             <span>
               Giấy tờ được gửi tới dịch vụ AI Google Gemini để đọc thông tin. Hệ thống không lưu file gốc, chỉ lưu thông tin đã đọc
-              được, và dữ liệu này chỉ máy chủ truy cập được. Hồ sơ hiện vẫn gắn với trình duyệt này; đăng nhập chưa gắn hồ sơ vào tài khoản.
+              được, và dữ liệu này chỉ máy chủ truy cập được. Hồ sơ gắn với tài khoản đăng nhập của bạn và chỉ bạn xem được.
             </span>
           </p>
         </div>

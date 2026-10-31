@@ -32,7 +32,7 @@ Cập nhật: 2026-10-24. Tóm tắt cách các phần hoạt động, chỗ nà
 
 ## 4. Dữ liệu và bảo mật
 - **Công khai** (`schools`, `scholarships`): RLS cho `anon`/`authenticated` chỉ SELECT; không có quyền ghi từ trình duyệt (đã kiểm chứng: INSERT/UPDATE/DELETE bằng publishable key đều bị từ chối).
-- **Riêng tư** (`student_profiles`, `student_documents`, cùng `conversations`, `messages`, `leads`): RLS bật, `anon`/`authenticated` bị chặn hoàn toàn (đã kiểm chứng 401), chỉ `service_role` ở server truy cập. Hồ sơ học viên gắn với cookie httpOnly (DB lưu sha256), **chưa có đăng nhập** nên ai giữ cookie đó xem được hồ sơ; sẽ thay bằng Supabase Auth ở Tuần 6.
+- **Riêng tư** (`student_profiles`, `student_documents`, cùng `conversations`, `messages`, `leads`): RLS bật, `anon`/`authenticated` bị chặn hoàn toàn (đã kiểm chứng 401), chỉ `service_role` ở server truy cập. **Hồ sơ học viên (`student_profiles`, `student_documents`) gắn với tài khoản đăng nhập (`user_id`) và có RLS theo từng người:** người dùng đã đăng nhập chỉ ĐỌC được hồ sơ và giấy tờ của chính mình (kể cả khi biết id của hồ sơ khác, database trả về rỗng), không có quyền ghi (điểm số do AI đọc nên chỉ server ghi), người chưa đăng nhập không có quyền gì. `/portal` yêu cầu đăng nhập, chưa đăng nhập thì chuyển sang `/login`. Đã kiểm chứng 21 trường hợp bằng `scripts/check-rls.mjs`.
 - Giấy tờ được gửi tới Google Gemini để đọc (giao diện có ghi rõ điều này).
 - Khi gợi ý học bổng chỉ gửi cho AI các con số học tập, không gửi họ tên/ngày sinh/số giấy tờ.
 - Giới hạn tần suất (in-memory, chỉ gần đúng trên serverless): tải giấy tờ 8 lần/phút/IP và 12/phút toàn site; gợi ý học bổng 4/phút/IP và 8/phút toàn site.

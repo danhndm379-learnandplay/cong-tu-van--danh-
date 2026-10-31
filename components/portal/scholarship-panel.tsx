@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +63,7 @@ export function ScholarshipPanel({
   initialAdvice: ScholarshipAdvice | null;
   autoGenerate: boolean;
 }) {
+  const router = useRouter();
   const [advice, setAdvice] = React.useState<ScholarshipAdvice | null>(initialAdvice);
   const [state, setState] = React.useState<PanelState>(autoGenerate && !initialAdvice ? "loading" : "idle");
   const [error, setError] = React.useState<string | null>(null);
@@ -74,6 +76,10 @@ export function ScholarshipPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ force }),
       });
+      if (res.status === 401) {
+        router.push("/login"); // hết phiên đăng nhập
+        return;
+      }
       const data = (await res.json()) as { ok: boolean; advice?: ScholarshipAdvice | null; message?: string };
       if (!res.ok || !data.ok) {
         setError(data.message ?? "Chưa tạo được gợi ý học bổng, bạn thử lại sau.");
@@ -87,7 +93,7 @@ export function ScholarshipPanel({
       setError("Có lỗi kết nối khi tạo gợi ý học bổng, bạn thử lại sau.");
       setState("error");
     }
-  }, []);
+  }, [router]);
 
   React.useEffect(() => {
     if (autoGenerate && !initialAdvice && !started.current) {
