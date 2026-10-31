@@ -1,35 +1,39 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_REALM, isAdminAuthEnabled, isAdminAuthorized } from "@/lib/admin-auth";
+import { ADMIN_LOGIN_PATH, adminLoginUrl, isStaffRole } from "@/lib/admin-role";
 import { authEnv, hasAuthSessionCookie, sessionCookieOptions } from "@/lib/auth-env";
 
-// Hai việc, chia theo đường dẫn:
-// 1) Trang admin có dữ liệu khách (hội thoại, yêu cầu báo giá): đăng nhập TUỲ CHỌN (HTTP Basic), chỉ bật khi đã đặt ADMIN_PASSWORD.
-//    Chưa đặt thì để mở (các trang admin dùng mock data cũng đang mở như vậy).
-// 2) Trang dùng phiên đăng nhập của người dùng:
-//    - /portal (cổng hồ sơ) BẮT BUỘC đăng nhập: chưa đăng nhập thì chuyển sang /login ngay tại đây;
-//    - /login: chỉ làm mới token Supabase trước khi trang render (Server Component không ghi được cookie).
-//    Chỉ gọi Supabase khi trình duyệt đang có cookie phiên. Trang và API vẫn tự kiểm tra lại (đây chỉ là lớp chặn sớm).
-function isAdminPath(pathname: string) {
-  return pathname.startsWith("/admin/");
+// Chặn sớm theo đường dẫn, dùng phiên đăng nhập Supabase (cookie) và làm mới token trước khi trang render
+// (Server Component không ghi được cookie). Chỉ gọi Supabase khi trình duyệt đang có cookie phiên.
+//   - /admin/* (trừ /admin/login): chỉ tài khoản có app_metadata.role = "admin" hoặc "nhan_vien"; không thì chuyển sang /admin/login?next=...
+//     (việc nhân viên chỉ được xem, không được sửa/xoá do trang, Server Action và RLS ở database quyết định)
+//   - /portal/*: phải đăng nhập (học viên, magic link); không thì chuyển sang /login
+//   - /login, /admin/login: chỉ làm mới token
+// Đây chỉ là lớp chặn sớm: trang, Server Action và route vẫn tự kiểm tra lại (lib/admin-guard.ts, lib/supabase-auth.ts).
+function isAdminArea(pathname: string) {
+  return (pathname === "/admin" || pathname.startsWith("/admin/")) && pathname !== ADMIN_LOGIN_PATH && !pathname.startsWith(`${ADMIN_LOGIN_PATH}/`);
 }
 
-function requiresLogin(pathname: string) {
+function isPortal(pathname: string) {
   return pathname === "/portal" || pathname.startsWith("/portal/");
 }
 
-function redirectToLogin(request: NextRequest, from?: NextResponse) {
-  const redirect = NextResponse.redirect(new URL("/login", request.url));
-  // Giữ lại cookie mà Supabase vừa xoá/làm mới (vd. phiên hết hạn) để trình duyệt dọn đúng.
-  from?.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-  return redirect;
-}
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  const adminArea = isAdminArea(pathname);
+  const mustLogin = adminArea || isPortal(pathname);
+  const loginTarget = adminArea ? adminLoginUrl(pathname + search) : "/login";
 
-async function handleUserPages(request: NextRequest) {
-  const mustLogin = requiresLogin(request.nextUrl.pathname);
+  const redirectToLogin = (from?: NextResponse) => {
+    const redirect = NextResponse.redirect(new URL(loginTarget, request.url));
+    // Giữ lại cookie mà Supabase vừa xoá/làm mới (vd. phiên hết hạn) để trình duyệt dọn đúng.
+    from?.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  };
+
   const env = authEnv();
   if (!env || !hasAuthSessionCookie(request.cookies.getAll().map((c) => c.name))) {
-    return mustLogin ? redirectToLogin(request) : NextResponse.next();
+    return mustLogin ? redirectToLogin() : NextResponse.next();
   }
 
   let response = NextResponse.next({ request });
@@ -47,27 +51,11 @@ async function handleUserPages(request: NextRequest) {
   });
   // getUser() nhờ máy chủ Supabase xác thực token (và làm mới nếu cần; cookie mới được ghi qua setAll ở trên).
   const { data } = await supabase.auth.getUser();
-  if (mustLogin && !data.user) return redirectToLogin(request, response);
+  if (mustLogin && !data.user) return redirectToLogin(response);
+  if (adminArea && !isStaffRole(data.user?.app_metadata)) return redirectToLogin(response);
   return response;
 }
 
-export async function proxy(request: NextRequest) {
-  if (!isAdminPath(request.nextUrl.pathname)) return handleUserPages(request);
-
-  if (!isAdminAuthEnabled()) return NextResponse.next();
-
-  if (isAdminAuthorized(request.headers.get("authorization"))) return NextResponse.next();
-
-  return new NextResponse("Cần đăng nhập quản trị để xem nội dung này.", {
-    status: 401,
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-store",
-      "WWW-Authenticate": `Basic realm="${ADMIN_REALM}", charset="UTF-8"`,
-    },
-  });
-}
-
 export const config = {
-  matcher: ["/admin/conversations", "/admin/conversations/:path*", "/admin/requests", "/portal", "/portal/:path*", "/login"],
+  matcher: ["/admin", "/admin/:path*", "/portal", "/portal/:path*", "/login"],
 };

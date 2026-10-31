@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DeleteConversationButton } from "@/components/admin/delete-conversation-button";
 import { LeadCard } from "@/components/admin/lead-card";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireStaff } from "@/lib/admin-guard";
 import { getConversationForAdmin } from "@/lib/chat-store";
 import { formatDateTime } from "@/lib/format";
 import { getLeadForAdmin, type StoredLead } from "@/lib/lead-store";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 export default async function AdminConversationDetailPage({
   params,
 }: PageProps<"/admin/conversations/[id]">) {
-  await requireAdmin();
+  const { canWrite } = await requireStaff();
 
   const { id } = await params;
   let conversation: Awaited<ReturnType<typeof getConversationForAdmin>>;
@@ -49,7 +49,7 @@ export default async function AdminConversationDetailPage({
       <AdminPageHeader
         title="Chi tiết cuộc trò chuyện"
         description={`Bắt đầu ${formatDateTime(conversation.createdAt)} · Hoạt động gần nhất ${formatDateTime(conversation.lastMessageAt)} · ${conversation.messages.length} tin nhắn`}
-        action={<DeleteConversationButton id={conversation.id} redirectTo="/admin/conversations" />}
+        action={canWrite ? <DeleteConversationButton id={conversation.id} redirectTo="/admin/conversations" /> : undefined}
       />
 
       <LeadCard
@@ -57,6 +57,7 @@ export default async function AdminConversationDetailPage({
         lead={lead}
         latestMessageId={conversation.messages.at(-1)?.id ?? null}
         loadFailed={leadLoadFailed}
+        canWrite={canWrite}
       />
 
       <Card className="p-4 sm:p-6">

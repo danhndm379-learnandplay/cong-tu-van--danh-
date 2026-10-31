@@ -22,7 +22,7 @@ async function ipOfCaller(): Promise<string> {
 
 /**
  * Admin bấm Duyệt: đổi trạng thái sang "đã duyệt" rồi gửi tên, email và link đăng nhập của khách tới webhook Make.com.
- * Server Action là endpoint công khai nên tự kiểm tra quyền ở đây (chỉ đòi đăng nhập khi đã đặt ADMIN_PASSWORD).
+ * Server Action là endpoint công khai nên tự kiểm tra quyền admin ở đây.
  * Gửi webhook thất bại thì hoàn tác việc duyệt để admin bấm lại được (không để khách "đã duyệt" mà không nhận được link).
  */
 export async function approveQuoteAction(id: string): Promise<ApproveResult> {
@@ -66,7 +66,7 @@ export async function approveQuoteAction(id: string): Promise<ApproveResult> {
 
 /**
  * Admin bấm Từ chối: XOÁ VĨNH VIỄN yêu cầu (chỉ khi còn "chờ duyệt"). Không gửi gì sang Make hay cho khách.
- * Tự kiểm tra quyền như mọi Server Action (chỉ đòi đăng nhập khi đã đặt ADMIN_PASSWORD).
+ * Tự kiểm tra quyền admin như mọi Server Action.
  */
 export async function rejectQuoteAction(id: string): Promise<RejectResult> {
   const allowed = await checkAdminWrite();

@@ -1,4 +1,4 @@
-import { isAdminAuthEnabled, isAdminAuthorized } from "@/lib/admin-auth";
+import { checkStaffRead } from "@/lib/admin-guard";
 import { formatDateTime } from "@/lib/format";
 import { parseQualityFilter } from "@/lib/lead-sanitize";
 import { leadsToCsv } from "@/lib/leads-csv";
@@ -6,10 +6,11 @@ import { listLeadsForExport } from "@/lib/lead-store";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 // Tải lead đã trích xuất ra CSV (?quality=good|ok|spam để lọc; bỏ trống = tất cả).
-// Route này đọc dữ liệu cá nhân của khách nên tự kiểm tra đăng nhập (khi đã đặt ADMIN_PASSWORD) và nằm trong matcher của proxy.ts.
+// Route này xuất dữ liệu cá nhân của khách nên tự kiểm tra quyền (admin hoặc nhân viên; xuất là đọc nên nhân viên cũng được).
 export async function GET(request: Request) {
-  if (isAdminAuthEnabled() && !isAdminAuthorized(request.headers.get("authorization"))) {
-    return new Response("Not found", { status: 404 });
+  const allowed = await checkStaffRead();
+  if (!allowed.ok) {
+    return new Response("Cần đăng nhập quản trị.", { status: 401, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";

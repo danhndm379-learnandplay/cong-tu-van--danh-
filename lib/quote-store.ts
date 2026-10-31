@@ -1,6 +1,7 @@
 import "server-only";
 
 import { adminDb } from "@/lib/chat-store";
+import { createAuthClient } from "@/lib/supabase-auth";
 import { priceFor, type QuoteInput } from "@/lib/quote";
 
 // Lưu yêu cầu báo giá vào bảng `quote_requests` (RIÊNG TƯ: RLS chặn trình duyệt, chỉ server bằng secret key).
@@ -49,7 +50,7 @@ export interface StoredQuoteRequest {
   createdAt: string;
 }
 
-/** Yêu cầu báo giá mới nhất trước, dành cho admin. Gọi `requireAdmin()` ở nơi dùng. */
+/** Yêu cầu báo giá mới nhất trước, dành cho admin. Gọi `requireStaff()` ở nơi dùng. */
 export async function listQuoteRequests(limit = 200): Promise<StoredQuoteRequest[]> {
   const { data, error } = await adminDb()
     .from("quote_requests")
@@ -81,7 +82,8 @@ export function isQuoteId(value: unknown): value is string {
  * cùng bấm cũng chỉ một người thành công. Trả về null nếu yêu cầu không tồn tại hoặc không còn ở trạng thái chờ duyệt.
  */
 export async function approveQuoteRequest(id: string): Promise<{ id: string; customerName: string; email: string } | null> {
-  const { data, error } = await adminDb()
+  // Chạy bằng phiên người dùng: RLS chỉ cho admin sửa (không phải admin thì không hàng nào bị đổi và hàm trả về null).
+  const { data, error } = await (await createAuthClient())
     .from("quote_requests")
     .update({ status: "da_duyet" })
     .eq("id", id)
@@ -94,7 +96,11 @@ export async function approveQuoteRequest(id: string): Promise<{ id: string; cus
 
 /** Hoàn tác việc duyệt (dùng khi gửi webhook thất bại) để admin có thể bấm Duyệt lại. */
 export async function revertQuoteApproval(id: string): Promise<void> {
-  const { error } = await adminDb().from("quote_requests").update({ status: "cho_duyet" }).eq("id", id).eq("status", "da_duyet");
+  const { error } = await (await createAuthClient())
+    .from("quote_requests")
+    .update({ status: "cho_duyet" })
+    .eq("id", id)
+    .eq("status", "da_duyet");
   if (error) throw new QuoteStorageError("revert quote approval", error);
 }
 
@@ -103,7 +109,8 @@ export async function revertQuoteApproval(id: string): Promise<void> {
  * xoá nhầm yêu cầu vừa được người khác duyệt. Trả về false nếu không tồn tại hoặc không còn ở trạng thái chờ duyệt.
  */
 export async function deletePendingQuoteRequest(id: string): Promise<boolean> {
-  const { data, error } = await adminDb()
+  // Chạy bằng phiên người dùng: RLS chỉ cho admin xoá.
+  const { data, error } = await (await createAuthClient())
     .from("quote_requests")
     .delete()
     .eq("id", id)

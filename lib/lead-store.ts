@@ -2,9 +2,11 @@ import "server-only";
 
 import { adminDb, StorageError } from "@/lib/chat-store";
 import type { Lead, LeadQuality } from "@/lib/lead-sanitize";
+import { createAuthClient } from "@/lib/supabase-auth";
 
 // Lưu lead vào bảng `leads` (RIÊNG TƯ, có PII; chỉ service_role truy cập được — xem migration create_leads_table).
-// Như chat-store: các hàm này không tự kiểm tra quyền, nơi gọi phải qua `requireAdmin()` / `checkAdminWrite()`.
+// Như chat-store: các hàm ĐỌC dùng secret key và không tự kiểm tra quyền (nơi gọi phải qua `requireStaff()` / `checkStaffRead()`);
+// hàm GHI (`saveLead`) chạy bằng phiên của người dùng nên RLS chỉ cho admin ghi (nơi gọi vẫn kiểm tra `checkAdminWrite()` trước).
 
 export interface StoredLead extends Lead {
   id: string;
@@ -71,13 +73,13 @@ export async function getLeadForAdmin(conversationId: string): Promise<StoredLea
   return data ? toStoredLead(data as LeadRow) : null;
 }
 
-/** Tạo hoặc ghi đè lead của cuộc trò chuyện (mỗi cuộc có tối đa một lead). */
+/** Tạo hoặc ghi đè lead của cuộc trò chuyện (mỗi cuộc có tối đa một lead). Chạy bằng phiên người dùng: RLS chỉ cho admin ghi. */
 export async function saveLead(
   conversationId: string,
   lead: Lead,
   source: { messageId: number | null; messageCount: number; model: string },
 ): Promise<StoredLead> {
-  const { data, error } = await adminDb()
+  const { data, error } = await (await createAuthClient())
     .from("leads")
     .upsert(
       {

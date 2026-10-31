@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireStaff } from "@/lib/admin-guard";
 import { formatDateTime } from "@/lib/format";
 import { QUOTE_PACKAGE_NAMES } from "@/lib/quote";
 import { listQuoteRequests } from "@/lib/quote-store";
@@ -28,8 +28,8 @@ function packageLabel(id: string) {
 }
 
 export default async function AdminRequestsPage() {
-  // Dữ liệu khách (tên, email): kiểm tra đăng nhập nếu đã bật, và đọc mới mỗi lần xem.
-  await requireAdmin();
+  // Dữ liệu khách (tên, email): admin và nhân viên xem được; chỉ admin có nút Duyệt/Từ chối. Đọc mới mỗi lần xem.
+  const { canWrite } = await requireStaff();
   await connection();
 
   let requests: Awaited<ReturnType<typeof listQuoteRequests>> | null = null;
@@ -83,7 +83,7 @@ export default async function AdminRequestsPage() {
                   <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(req.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex items-start justify-end gap-2">
-                      {req.status === "cho_duyet" ? (
+                      {canWrite && req.status === "cho_duyet" ? (
                         <>
                           <ApproveQuoteButton id={req.id} email={req.email} />
                           <RejectQuoteButton id={req.id} name={req.customerName} />

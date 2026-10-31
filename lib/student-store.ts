@@ -72,6 +72,12 @@ function toStoredDoc(row: DocRow): StoredStudentDoc {
   };
 }
 
+/** Dùng chung với trang quản trị (lib/admin-student-store.ts). */
+export const STUDENT_DOC_COLUMNS = DOC_COLUMNS;
+export function docRowToStored(row: unknown): StoredStudentDoc {
+  return toStoredDoc(row as DocRow);
+}
+
 export interface StudentSnapshot {
   profileId: string | null;
   documents: Partial<Record<DocType, StoredStudentDoc>>;

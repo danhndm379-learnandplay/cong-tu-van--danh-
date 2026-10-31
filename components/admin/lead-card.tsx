@@ -23,11 +23,14 @@ export function LeadCard({
   lead,
   latestMessageId,
   loadFailed,
+  canWrite,
 }: {
   conversationId: string;
   lead: StoredLead | null;
   latestMessageId: number | null;
   loadFailed?: boolean;
+  /** Chỉ admin được trích xuất/trích xuất lại lead (ghi vào database); nhân viên chỉ xem. */
+  canWrite: boolean;
 }) {
   const stale =
     lead !== null &&
@@ -41,7 +44,7 @@ export function LeadCard({
           <h2 className="text-base font-medium">Thông tin lead</h2>
           {lead && <LeadQualityBadge quality={lead.quality} />}
         </div>
-        <ExtractLeadButton conversationId={conversationId} hasLead={lead !== null} />
+        {canWrite && <ExtractLeadButton conversationId={conversationId} hasLead={lead !== null} />}
       </div>
 
       {loadFailed ? (

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { unstable_rethrow } from "next/navigation";
 import { authEnv, sessionCookieOptions } from "@/lib/auth-env";
 
 // Đăng nhập người dùng bằng Supabase Auth (magic link). Phiên lưu trong cookie httpOnly do @supabase/ssr quản lý;
@@ -49,6 +50,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     if (error || !data.user) return null;
     return { id: data.user.id, email: data.user.email ?? null };
   } catch (err) {
+    unstable_rethrow(err); // tín hiệu nội bộ của Next (render động, redirect...) phải đi tiếp, không được nuốt
     console.error("[auth] Không đọc được phiên đăng nhập:", err);
     return null;
   }

@@ -5,11 +5,14 @@ import { usePathname } from "next/navigation";
 import {
   FileClock,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   School,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { adminSignOutAction } from "@/app/admin/login/actions";
+import { ROLE_LABELS, type StaffRole } from "@/lib/admin-role";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +28,7 @@ function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 }
 
-export function AdminSidebar() {
+export function AdminSidebar({ email, role }: { email: string | null; role: StaffRole | null }) {
   const pathname = usePathname();
 
   return (
@@ -59,13 +62,35 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="border-t p-3">
+      <div className="space-y-1 border-t p-3">
         <Link
           href="/"
           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/70 duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           Xem trang khách ↗
         </Link>
+        <div className="px-3 pt-2">
+          {email && (
+            <p className="truncate text-xs text-muted-foreground" title={email}>
+              {email}
+            </p>
+          )}
+          {role && (
+            <p className="mt-0.5 text-xs font-medium text-sidebar-foreground/80">
+              {ROLE_LABELS[role]}
+              {role === "nhan_vien" && " (chỉ xem)"}
+            </p>
+          )}
+          <form action={adminSignOutAction}>
+            <button
+              type="submit"
+              className="mt-1 flex items-center gap-2 text-sm text-sidebar-foreground/70 duration-150 hover:text-sidebar-accent-foreground"
+            >
+              <LogOut className="size-4" />
+              Đăng xuất
+            </button>
+          </form>
+        </div>
       </div>
     </aside>
   );
@@ -95,6 +120,15 @@ export function AdminMobileNav() {
           </Link>
         );
       })}
+      <form action={adminSignOutAction} className="ml-auto shrink-0">
+        <button
+          type="submit"
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-sidebar-foreground/70 duration-150 hover:bg-sidebar-accent"
+        >
+          <LogOut className="size-3.5 shrink-0" />
+          Đăng xuất
+        </button>
+      </form>
     </nav>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { DeleteConversationButton } from "@/components/admin/delete-conversation-button";
 import { LeadQualityBadge } from "@/components/admin/lead-quality-badge";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireStaff } from "@/lib/admin-guard";
 import { ADMIN_PAGE_SIZE, listConversationsForAdmin } from "@/lib/chat-store";
 import { formatDateTime } from "@/lib/format";
 import { parseQualityFilter, type LeadQualityFilter } from "@/lib/lead-sanitize";
@@ -37,7 +37,7 @@ function listHref(page: number, quality: LeadQualityFilter | null) {
 export default async function AdminConversationsPage({
   searchParams,
 }: PageProps<"/admin/conversations">) {
-  await requireAdmin();
+  const { canWrite } = await requireStaff();
 
   const query = await searchParams;
   const rawPage = query.page;
@@ -131,7 +131,7 @@ export default async function AdminConversationsPage({
                     nativeButton={false}
                     render={<Link href={`/admin/conversations/${conv.id}`}>Xem</Link>}
                   />
-                  <DeleteConversationButton id={conv.id} compact />
+                  {canWrite && <DeleteConversationButton id={conv.id} compact />}
                 </div>
               </Card>
             ))}
@@ -173,7 +173,7 @@ export default async function AdminConversationsPage({
                           nativeButton={false}
                           render={<Link href={`/admin/conversations/${conv.id}`}>Xem</Link>}
                         />
-                        <DeleteConversationButton id={conv.id} compact />
+                        {canWrite && <DeleteConversationButton id={conv.id} compact />}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -12,9 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatScore } from "@/lib/format";
+import { requireStaff } from "@/lib/admin-guard";
 import { listSchools } from "@/lib/school-store";
 
 export default async function AdminSchoolsPage() {
+  await requireStaff();
   // Đọc dữ liệu thật từ Supabase mỗi lần xem (không prerender lúc build, để sửa dữ liệu trong DB là thấy ngay).
   await connection();
 

@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@supabase/server/core";
 import { chatLimits, type StoredMessage } from "@/lib/chatbot-config";
 import type { LeadQuality, LeadQualityFilter } from "@/lib/lead-sanitize";
+import { createAuthClient } from "@/lib/supabase-auth";
 
 // Lưu lịch sử chat vào Supabase. Hai bảng `conversations` và `messages` là dữ liệu riêng tư:
 // RLS bật, anon/authenticated không có quyền gì, chỉ secret key (service_role) trên server truy cập được.
@@ -119,7 +120,7 @@ export async function appendTurn(
 }
 
 // ---- Dành cho trang admin (xem hội thoại thật của khách) ----
-// Các hàm dưới đây KHÔNG tự kiểm tra quyền: nơi gọi phải gọi `requireAdmin()` (lib/admin-guard.ts) trước.
+// Các hàm dưới đây KHÔNG tự kiểm tra quyền: nơi gọi phải gọi `requireStaff()` (lib/admin-guard.ts) trước.
 
 export const ADMIN_PAGE_SIZE = 20;
 const ADMIN_MAX_MESSAGES = 2000;
@@ -219,11 +220,13 @@ export async function getConversationForAdmin(id: string): Promise<AdminConversa
 
 /**
  * Xoá VĨNH VIỄN một cuộc trò chuyện cùng toàn bộ tin nhắn (tin nhắn bị xoá theo qua `on delete cascade`).
- * Trả về false nếu id không hợp lệ hoặc không tồn tại. Nơi gọi phải kiểm tra quyền ghi (`checkAdminWrite()`) trước.
+ * Trả về false nếu id không hợp lệ, không tồn tại HOẶC người gọi không phải admin (RLS từ chối: không xoá hàng nào).
+ * Chạy bằng PHIÊN CỦA NGƯỜI DÙNG (không phải secret key) để RLS ở database quyết định theo vai trò; nơi gọi vẫn kiểm tra
+ * `checkAdminWrite()` trước để báo lỗi rõ ràng.
  */
 export async function deleteConversationForAdmin(id: string): Promise<boolean> {
   if (!UUID_PATTERN.test(id)) return false;
-  const { data, error } = await db().from("conversations").delete().eq("id", id).select("id");
+  const { data, error } = await (await createAuthClient()).from("conversations").delete().eq("id", id).select("id");
   if (error) throw new StorageError("delete conversation", error);
   return (data?.length ?? 0) > 0;
 }
