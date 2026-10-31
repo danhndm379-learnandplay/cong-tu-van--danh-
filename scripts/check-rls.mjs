@@ -98,9 +98,10 @@ check("Secret key (server) vẫn đọc được mọi hồ sơ", all.data.lengt
 // Dọn: xoá hai người dùng thử (hồ sơ + giấy tờ xoá theo nhờ on delete cascade) và kiểm tra cascade
 await admin.auth.admin.deleteUser(A.id);
 await admin.auth.admin.deleteUser(B.id);
-const left = await admin.from("student_profiles").select("id", { count: "exact", head: true });
-const leftDocs = await admin.from("student_documents").select("id", { count: "exact", head: true });
-check("Xoá tài khoản thì hồ sơ + giấy tờ xoá theo (cascade)", left.count === 0 && leftDocs.count === 0, `còn ${left.count} hồ sơ, ${leftDocs.count} giấy tờ`);
+// Chỉ đếm hồ sơ/giấy tờ do chính script này tạo (pa, pb): trong database thật có thể đã có hồ sơ của học viên khác.
+const left = await admin.from("student_profiles").select("id", { count: "exact", head: true }).in("id", [pa, pb]);
+const leftDocs = await admin.from("student_documents").select("id", { count: "exact", head: true }).in("profile_id", [pa, pb]);
+check("Xoá tài khoản thì hồ sơ + giấy tờ xoá theo (cascade)", left.count === 0 && leftDocs.count === 0, `còn ${left.count} hồ sơ, ${leftDocs.count} giấy tờ của hai người dùng thử`);
 
 console.log(`\n${results.filter(Boolean).length}/${results.length} kiểm tra đạt`);
 process.exit(results.every(Boolean) ? 0 : 1);
