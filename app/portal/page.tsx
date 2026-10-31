@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Lock } from "lucide-react";
+import { UserBar } from "@/components/auth/user-bar";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentUploadCard } from "@/components/portal/document-upload-card";
@@ -12,6 +13,7 @@ import { formatFileSize } from "@/lib/format";
 import { DOC_TYPES, type DocType } from "@/lib/portal-docs";
 import { buildAdviceContext, computePortalResults } from "@/lib/portal-results";
 import { loadStudentSnapshot, STUDENT_COOKIE } from "@/lib/student-store";
+import { getCurrentUser } from "@/lib/supabase-auth";
 
 // Trang riêng tư của học viên: không để công cụ tìm kiếm lập chỉ mục.
 export const metadata: Metadata = {
@@ -22,6 +24,7 @@ export const metadata: Metadata = {
 export default async function PortalPage() {
   // Đọc cookie nhận diện học viên nên trang luôn render theo từng người dùng (không prerender, không dùng chung bộ nhớ đệm).
   const token = (await cookies()).get(STUDENT_COOKIE)?.value;
+  const user = await getCurrentUser();
 
   let loaded: {
     snapshot: Awaited<ReturnType<typeof loadStudentSnapshot>>;
@@ -42,6 +45,7 @@ export default async function PortalPage() {
       <>
         <SiteHeader />
         <main className="mx-auto max-w-5xl px-6 pb-24 pt-32">
+          <UserBar user={user} />
           <Card className="p-6 text-sm text-muted-foreground">
             Không tải được hồ sơ của bạn lúc này (lỗi kết nối cơ sở dữ liệu). Bạn tải lại trang sau ít phút nhé.
           </Card>
@@ -66,6 +70,7 @@ export default async function PortalPage() {
     <>
       <SiteHeader />
       <main className="mx-auto max-w-5xl px-6 pb-24 pt-32">
+        <UserBar user={user} />
         <div className="border-b pb-6">
           <p className="text-sm text-muted-foreground">{studentName ? "Xin chào," : "Cổng hồ sơ du học"}</p>
           <h1 className="text-2xl font-medium tracking-tight">{studentName ?? "Hồ sơ của bạn"}</h1>
@@ -73,7 +78,7 @@ export default async function PortalPage() {
             <Lock className="mt-0.5 size-3.5 shrink-0" />
             <span>
               Giấy tờ được gửi tới dịch vụ AI Google Gemini để đọc thông tin. Hệ thống không lưu file gốc, chỉ lưu thông tin đã đọc
-              được, và dữ liệu này chỉ máy chủ truy cập được. Hồ sơ gắn với trình duyệt này (chưa có đăng nhập).
+              được, và dữ liệu này chỉ máy chủ truy cập được. Hồ sơ hiện vẫn gắn với trình duyệt này; đăng nhập chưa gắn hồ sơ vào tài khoản.
             </span>
           </p>
         </div>

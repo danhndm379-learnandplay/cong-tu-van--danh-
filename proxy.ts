@@ -1,9 +1,42 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_REALM, isAdminAuthEnabled, isAdminAuthorized } from "@/lib/admin-auth";
+import { authEnv, hasAuthSessionCookie, sessionCookieOptions } from "@/lib/auth-env";
 
-// Đăng nhập tuỳ chọn cho trang xem hội thoại thật của khách: chỉ bật khi đã đặt ADMIN_PASSWORD.
-// Chưa đặt thì để mở (các trang admin dùng mock data cũng đang mở như vậy).
-export function proxy(request: NextRequest) {
+// Hai việc, chia theo đường dẫn:
+// 1) Trang admin có dữ liệu khách (hội thoại, yêu cầu báo giá): đăng nhập TUỲ CHỌN (HTTP Basic), chỉ bật khi đã đặt ADMIN_PASSWORD.
+//    Chưa đặt thì để mở (các trang admin dùng mock data cũng đang mở như vậy).
+// 2) Trang dùng phiên đăng nhập của người dùng (/portal, /login): làm mới token Supabase trước khi trang render, vì Server Component
+//    không ghi được cookie. Chỉ gọi Supabase khi trình duyệt đang có cookie phiên.
+function isAdminPath(pathname: string) {
+  return pathname.startsWith("/admin/");
+}
+
+async function refreshUserSession(request: NextRequest) {
+  const env = authEnv();
+  if (!env || !hasAuthSessionCookie(request.cookies.getAll().map((c) => c.name))) return NextResponse.next();
+
+  let response = NextResponse.next({ request });
+  const supabase = createServerClient(env.url, env.key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, sessionCookieOptions(options)));
+      },
+    },
+  });
+  // Gọi getUser() để Supabase xác thực và làm mới token nếu cần (cookie mới được ghi qua setAll ở trên).
+  await supabase.auth.getUser();
+  return response;
+}
+
+export async function proxy(request: NextRequest) {
+  if (!isAdminPath(request.nextUrl.pathname)) return refreshUserSession(request);
+
   if (!isAdminAuthEnabled()) return NextResponse.next();
 
   if (isAdminAuthorized(request.headers.get("authorization"))) return NextResponse.next();
@@ -19,5 +52,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/conversations", "/admin/conversations/:path*"],
+  matcher: ["/admin/conversations", "/admin/conversations/:path*", "/admin/requests", "/portal", "/login"],
 };

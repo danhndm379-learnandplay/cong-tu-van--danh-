@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { clientIp } from "@/lib/client-ip";
 import { countries } from "@/lib/mock-data";
-import { parseQuoteRequest } from "@/lib/quote";
+import { buildQuoteWebhookPayload, parseQuoteRequest } from "@/lib/quote";
+import { notifyQuoteWebhook } from "@/lib/quote-webhook";
 import { createQuoteRequest } from "@/lib/quote-store";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -37,6 +39,8 @@ export async function POST(request: Request) {
 
   try {
     const saved = await createQuoteRequest(parsed.value);
+    // Báo cho Make.com sau khi đã trả lời khách; yêu cầu đã lưu rồi nên webhook lỗi cũng không làm hỏng yêu cầu.
+    after(() => notifyQuoteWebhook(buildQuoteWebhookPayload(parsed.value, saved)));
     return Response.json({ ok: true, price: saved.price, servicePackage: parsed.value.servicePackage }, { headers: NO_STORE });
   } catch (err) {
     console.error("[api/quotes] Lỗi:", err);

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { countries, servicePackages, type ServicePackage } from "@/lib/mock-data";
+import { EMAIL_INVALID_MESSAGE, isValidEmail } from "@/lib/quote";
 
 const degreeLevels = [
   { value: "thpt", label: "THPT" },
@@ -47,12 +48,30 @@ export function QuoteForm() {
   const [email, setEmail] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [emailError, setEmailError] = React.useState<string | null>(null);
   // Mức giá lấy từ phản hồi của server (server tự tính theo gói), không dùng giá ở trình duyệt.
   const [quoted, setQuoted] = React.useState<{ price: number; packageName: string } | null>(null);
+
+  function checkEmail(value: string) {
+    if (!value.trim()) return "Vui lòng nhập email.";
+    return isValidEmail(value) ? null : EMAIL_INVALID_MESSAGE;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
+    // Email sai định dạng thì báo ngay dưới ô nhập và KHÔNG gửi form.
+    const invalidEmail = checkEmail(email);
+    if (invalidEmail) {
+      setEmailError(invalidEmail);
+      setQuoted(null);
+      document.getElementById("email")?.focus();
+      return;
+    }
+    if (!name.trim()) {
+      setError("Vui lòng nhập họ tên.");
+      return;
+    }
     if (!country) {
       setError("Vui lòng chọn quốc gia muốn du học.");
       return;
@@ -66,7 +85,7 @@ export function QuoteForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName: name,
-          email,
+          email: email.trim(),
           studyCountry: country,
           educationLevel: degreeLevel,
           servicePackage: selectedPackage,
@@ -99,7 +118,7 @@ export function QuoteForm() {
         </div>
 
         <Card className="mt-10 p-6 md:p-8">
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} noValidate className="space-y-8">
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="country">Quốc gia muốn du học</Label>
@@ -206,8 +225,20 @@ export function QuoteForm() {
                   autoComplete="email"
                   placeholder="ban@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  aria-invalid={emailError ? true : undefined}
+                  aria-describedby={emailError ? "email-error" : undefined}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    // Đang sửa thì ẩn lỗi cũ ngay khi email đã đúng.
+                    if (emailError && !checkEmail(e.target.value)) setEmailError(null);
+                  }}
+                  onBlur={() => email && setEmailError(checkEmail(email))}
                 />
+                {emailError && (
+                  <p id="email-error" role="alert" className="text-sm text-destructive">
+                    {emailError}
+                  </p>
+                )}
               </div>
             </div>
 

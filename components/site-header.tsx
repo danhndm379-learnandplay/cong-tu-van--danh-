@@ -11,6 +11,7 @@ const menuItems = [
   { name: "Trang chủ", href: "/" },
   { name: "Điểm chuẩn trường", href: "/schools" },
   { name: "Cổng hồ sơ", href: "/portal" },
+  { name: "Đăng nhập", href: "/login" },
   { name: "Admin", href: "/admin" },
 ];
 

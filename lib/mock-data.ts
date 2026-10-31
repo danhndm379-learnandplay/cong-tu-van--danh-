@@ -64,58 +64,6 @@ export const servicePackages: ServiceOption[] = [
   },
 ];
 
-export interface AdmissionRequest {
-  id: string;
-  customerName: string;
-  package: ServicePackage;
-  quote: number;
-  status: RequestStatus;
-  createdAt: string;
-}
-
-export const admissionRequests: AdmissionRequest[] = [
-  {
-    id: "req_2101",
-    customerName: "Trần Thị Bích",
-    package: "toan_dien",
-    quote: QUOTE_PRICES.toan_dien,
-    status: "cho_duyet",
-    createdAt: "2026-08-06 08:20",
-  },
-  {
-    id: "req_2100",
-    customerName: "Đỗ Ngọc Lan",
-    package: "toan_dien",
-    quote: QUOTE_PRICES.toan_dien,
-    status: "cho_duyet",
-    createdAt: "2026-08-05 09:12",
-  },
-  {
-    id: "req_2099",
-    customerName: "Lê Văn Hùng",
-    package: "co_ban",
-    quote: QUOTE_PRICES.co_ban,
-    status: "da_duyet",
-    createdAt: "2026-08-04 14:30",
-  },
-  {
-    id: "req_2098",
-    customerName: "Phạm Thu Hà",
-    package: "toan_dien",
-    quote: QUOTE_PRICES.toan_dien,
-    status: "da_duyet",
-    createdAt: "2026-08-03 10:05",
-  },
-  {
-    id: "req_2097",
-    customerName: "Nguyễn Đức Anh",
-    package: "co_ban",
-    quote: QUOTE_PRICES.co_ban,
-    status: "tu_choi",
-    createdAt: "2026-08-02 16:47",
-  },
-];
-
 export interface StudentProfile {
   id: string;
   studentName: string;
