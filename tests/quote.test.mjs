@@ -1,7 +1,7 @@
 // Test bảng giá và kiểm tra dữ liệu form báo giá (lib/quote.ts). Chạy: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildApprovedWebhookPayload, EMAIL_INVALID_MESSAGE, isValidEmail, parseLoginUrl, resolveLoginUrl, parseQuoteRequest, priceFor, QUOTE_PRICES } from "../lib/quote.ts";
+import { pickSiteBase, buildApprovedWebhookPayload, EMAIL_INVALID_MESSAGE, isValidEmail, parseLoginUrl, resolveLoginUrl, parseQuoteRequest, priceFor, QUOTE_PRICES } from "../lib/quote.ts";
 
 const countries = ["Mỹ", "Anh", "Úc"];
 const good = { customerName: "  Nguyễn   Văn A ", email: " a@example.com ", studyCountry: "Úc", educationLevel: "dai_hoc", servicePackage: "toan_dien" };
@@ -135,4 +135,12 @@ test("parseLoginUrl: chỉ http(s) không kèm tài khoản", () => {
   assert.equal(parseLoginUrl("ftp://a.example/x"), null);
   assert.equal(parseLoginUrl("data:text/html,x"), null);
   assert.equal(parseLoginUrl("https://a.example/login"), "https://a.example/login");
+});
+
+test("pickSiteBase: bỏ qua localhost khi chạy sản xuất, giữ nguyên khi chạy dev", () => {
+  assert.equal(pickSiteBase("https://cong-tu-van-danh.vercel.app/", "https://x.example", true), "https://cong-tu-van-danh.vercel.app");
+  assert.equal(pickSiteBase("http://localhost:3000", "https://thật.example", true), "https://thật.example", "localhost trên bản sản xuất bị bỏ qua");
+  assert.equal(pickSiteBase("http://127.0.0.1:3000", "https://thật.example", true), "https://thật.example");
+  assert.equal(pickSiteBase("http://localhost:3000", "http://localhost:3100", false), "http://localhost:3000", "khi dev thì dùng giá trị cấu hình");
+  for (const bad of [undefined, "", "  ", "không phải url", "javascript:alert(1)", "ftp://a.example"]) assert.equal(pickSiteBase(bad, "https://fb.example", true), "https://fb.example", String(bad));
 });

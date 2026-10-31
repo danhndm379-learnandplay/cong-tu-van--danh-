@@ -3,6 +3,7 @@ import "server-only";
 import {
   parseWebhookUrl,
   postQuoteWebhook,
+  pickSiteBase,
   resolveLoginUrl,
   type QuoteApprovedWebhookPayload,
   type QuoteWebhookPayload,
@@ -39,8 +40,8 @@ export async function sendApprovedWebhook(payload: QuoteApprovedWebhookPayload):
   return result;
 }
 
-/** Link đăng nhập gửi cho khách: QUOTE_LOGIN_URL nếu có, không thì /login trên NEXT_PUBLIC_SITE_URL (hoặc `fallbackOrigin`). */
+/** Link đăng nhập gửi cho khách: QUOTE_LOGIN_URL nếu có, không thì /login trên NEXT_PUBLIC_SITE_URL (bỏ qua nếu là localhost khi chạy sản xuất) hoặc `fallbackOrigin`. */
 export function loginUrlForCustomers(fallbackOrigin: string): string {
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  return resolveLoginUrl(process.env.QUOTE_LOGIN_URL, site || fallbackOrigin);
+  const base = pickSiteBase(process.env.NEXT_PUBLIC_SITE_URL, fallbackOrigin, process.env.NODE_ENV === "production");
+  return resolveLoginUrl(process.env.QUOTE_LOGIN_URL, base);
 }

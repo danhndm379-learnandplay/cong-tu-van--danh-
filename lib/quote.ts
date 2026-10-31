@@ -156,6 +156,24 @@ export function parseLoginUrl(raw: string | undefined): string | null {
 }
 
 /**
+ * Địa chỉ gốc của website dùng để dựng link gửi cho khách. Dùng `configured` (NEXT_PUBLIC_SITE_URL) nếu hợp lệ; nhưng khi chạy bản
+ * sản xuất mà giá trị trỏ về localhost (vd. lỡ chép từ .env.example lên Vercel) thì BỎ QUA và dùng địa chỉ của request, để email gửi
+ * cho khách không chứa link localhost.
+ */
+export function pickSiteBase(configured: string | undefined, fallbackOrigin: string, isProduction: boolean): string {
+  const value = configured?.trim();
+  if (!value) return fallbackOrigin;
+  try {
+    const url = new URL(value);
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || (isProduction && local)) return fallbackOrigin;
+    return url.origin;
+  } catch {
+    return fallbackOrigin;
+  }
+}
+
+/**
  * Link đăng nhập gửi cho khách. Ưu tiên giá trị đã cấu hình (`QUOTE_LOGIN_URL`: tuần sau chỉ cần đổi giá trị này thành link thật),
  * không có thì dùng trang /login trên địa chỉ website (`siteUrl`).
  */
