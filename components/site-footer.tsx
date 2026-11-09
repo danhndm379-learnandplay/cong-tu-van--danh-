@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { CONTACT_EMAIL } from "@/lib/site-config";
 
 export function SiteFooter() {
   return (
@@ -20,7 +21,7 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <Mail className="size-4 shrink-0" />
-                <span>hotro@duhoc24.vn</span>
+                <span>{CONTACT_EMAIL}</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="size-4 shrink-0" />
@@ -49,6 +50,11 @@ export function SiteFooter() {
               <li>
                 <Link href="/portal" className="text-muted-foreground duration-150 hover:text-primary">
                   Cổng hồ sơ
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="text-muted-foreground duration-150 hover:text-primary">
+                  Chính sách quyền riêng tư
                 </Link>
               </li>
             </ul>

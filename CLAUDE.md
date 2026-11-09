@@ -28,6 +28,7 @@ npm run lint    # ESLint 9 (flat config, eslint.config.mjs)
 - **Path alias:** `@/*` trỏ về root repo (ví dụ `@/components/ui/button`, `@/lib/mock-data`).
 - **Ba khu vực route:**
   - `/` — landing page ghép từ `components/landing/*` (hero, quote-form, highlights, chat-widget) cùng `site-header`/`site-footer`.
+  - `/privacy` — chính sách quyền riêng tư (trang tĩnh công khai, link ở chân trang; email liên hệ xoá dữ liệu lấy từ `lib/site-config.ts`). Nội dung phải khớp thực tế sản phẩm (hiện KHÔNG có đăng nhập Google), sửa khi thêm cách thu thập dữ liệu hoặc bên xử lý mới.
   - `/portal` — cổng học viên, ghép từ `components/portal/*`, bắt buộc đăng nhập, chỉ đọc hồ sơ của chính người dùng (RLS).
   - `/admin/*` — dùng chung `app/admin/layout.tsx` (sidebar + mobile nav); `/admin` redirect sang `/admin/requests`. Các page con: `requests`, `schools`, `profiles`, `conversations`.
 - **Server Component là mặc định.** Các page admin/portal là Server Component import thẳng từ `lib/mock-data.ts`; chỉ những component cần state/tương tác mới có `"use client"` (`site-header`, `admin/sidebar`, `landing/quote-form`, `landing/chat-widget`, và vài wrapper trong `ui/`).
