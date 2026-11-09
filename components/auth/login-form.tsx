@@ -3,6 +3,7 @@
 import React from "react";
 import { useActionState } from "react";
 import { Mail, MailCheck } from "lucide-react";
+import { GoogleButton } from "@/components/auth/google-button";
 import { sendMagicLinkAction, type LoginState } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,10 +41,27 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
     );
   }
 
-  const error = localError ?? (state.status === "error" ? state.message : initialError);
+  // Lỗi của ô email (nhập sai, gửi thất bại) hiện dưới ô; lỗi từ trang khác chuyển về (đăng nhập Google bị huỷ, link hết hạn...) hiện ở đầu form.
+  const error = localError ?? (state.status === "error" ? state.message : null);
+  const pageError = error ? null : initialError;
   const defaultEmail = state.status === "error" || state.status === "sent" ? state.email : "";
 
   return (
+    <div className="space-y-5">
+      {pageError && (
+        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {pageError}
+        </p>
+      )}
+
+      <GoogleButton />
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        hoặc nhận link đăng nhập qua email
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
     <form
       action={formAction}
       noValidate
@@ -94,5 +112,6 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
         Không cần mật khẩu. Chúng tôi gửi một link vào email của bạn, bấm vào link đó là đăng nhập xong.
       </p>
     </form>
+    </div>
   );
 }

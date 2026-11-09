@@ -9,7 +9,7 @@ import { getCurrentUser } from "@/lib/supabase-auth";
 
 export const metadata: Metadata = {
   title: "Đăng nhập — DuHoc24",
-  description: "Đăng nhập vào cổng hồ sơ du học bằng link gửi qua email, không cần mật khẩu.",
+  description: "Đăng nhập vào cổng hồ sơ du học bằng tài khoản Google hoặc link gửi qua email, không cần mật khẩu.",
   robots: { index: false, follow: false },
 };
 
@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-medium tracking-tight">Đăng nhập</CardTitle>
-            <CardDescription>Nhập email của bạn để nhận link đăng nhập vào cổng hồ sơ.</CardDescription>
+            <CardDescription>Đăng nhập bằng tài khoản Google, hoặc nhập email để nhận link đăng nhập vào cổng hồ sơ.</CardDescription>
           </CardHeader>
           <CardContent>
             <LoginForm initialError={initialError} />

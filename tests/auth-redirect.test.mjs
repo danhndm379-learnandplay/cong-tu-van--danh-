@@ -32,6 +32,12 @@ test("thông điệp lỗi ở /login chỉ theo mã đã biết, không phản 
   assert.equal(loginErrorFromSupabase("otp_expired"), "link_expired");
   assert.equal(loginErrorFromSupabase("anything"), "link_invalid");
   assert.equal(loginErrorFromSupabase(null), "link_invalid");
+  assert.equal(loginErrorFromSupabase(null, "access_denied"), "oauth_cancelled", "bấm Huỷ ở màn hình Google");
+  assert.equal(loginErrorFromSupabase("otp_expired", "access_denied"), "link_expired", "link email hết hạn vẫn ưu tiên");
+  assert.equal(loginErrorFromSupabase(null, "server_error"), "link_invalid");
+  assert.match(loginErrorMessage("oauth_cancelled"), /huỷ đăng nhập bằng Google/);
+  assert.match(loginErrorMessage("oauth_failed"), /Google/);
+  assert.match(loginErrorMessage("rate_limited"), /hơi nhanh/);
 });
 
 test("hasAuthSessionCookie: nhận cookie phiên của @supabase/ssr, kể cả bị chia nhỏ", () => {

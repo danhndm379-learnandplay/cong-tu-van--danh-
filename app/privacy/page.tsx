@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <SiteHeader />
       <main className="mx-auto max-w-3xl px-6 pb-24 pt-32">
         <h1 className="text-3xl font-medium tracking-tight">Chính sách quyền riêng tư</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Cập nhật lần cuối: 09/11/2026</p>
+        <p className="mt-2 text-sm text-muted-foreground">Cập nhật lần cuối: 10/11/2026</p>
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
           DuHoc24 là dịch vụ tiếp nhận và xử lý hồ sơ du học. Trang này nói ngắn gọn chúng tôi thu thập thông tin gì của bạn, dùng để làm gì, lưu ở đâu và
           bạn yêu cầu xoá dữ liệu bằng cách nào.
@@ -33,8 +33,8 @@ export default function PrivacyPage() {
         <Section title="1. Thông tin chúng tôi thu thập">
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <span className="font-medium text-foreground">Tài khoản đăng nhập:</span> địa chỉ email bạn dùng để đăng nhập cổng hồ sơ (bằng link gửi qua
-              email, không cần mật khẩu).
+              <span className="font-medium text-foreground">Tài khoản đăng nhập:</span> nếu bạn đăng nhập bằng Google, chúng tôi nhận email, tên hiển thị và
+              ảnh đại diện của tài khoản Google đó (chúng tôi không nhận mật khẩu Google của bạn); nếu bạn nhận link qua email, chúng tôi chỉ lưu địa chỉ email đó.
             </li>
             <li>
               <span className="font-medium text-foreground">Form báo giá:</span> họ tên, email, quốc gia muốn du học, bậc học và gói dịch vụ bạn chọn.
@@ -69,6 +69,7 @@ export default function PrivacyPage() {
           <p>Để vận hành dịch vụ, một số thông tin được chuyển qua các bên xử lý sau:</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>Vercel: chạy website.</li>
+            <li>Google: xác thực khi bạn chọn đăng nhập bằng Google.</li>
             <li>Google Gemini: đọc giấy tờ bạn tải lên và trả lời trong chatbot (nội dung liên quan được gửi tới Google để xử lý).</li>
             <li>Make.com và dịch vụ gửi email: gửi email báo giá và email mời đăng nhập (gồm họ tên, email, gói dịch vụ).</li>
           </ul>

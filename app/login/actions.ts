@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { authEnv } from "@/lib/auth-env";
 import { clientIp } from "@/lib/client-ip";
 import { EMAIL_INVALID_MESSAGE, isValidEmail } from "@/lib/quote";
@@ -70,4 +70,35 @@ export async function signOutAction(): Promise<void> {
     console.error("[login] Đăng xuất thất bại:", err);
   }
   redirect("/login");
+}
+
+const GOOGLE_LIMIT_PER_IP = 10;
+
+/**
+ * Bắt đầu đăng nhập bằng Google: tạo link OAuth của Supabase (luồng PKCE, cookie code-verifier được ghi ở đây) rồi chuyển người dùng sang Google.
+ * `prompt=select_account` để Google luôn cho chọn tài khoản. Google trả về Supabase, Supabase trả về `/auth/callback?code=...`, nơi đổi code thành phiên.
+ * Không có ô nhập mật khẩu nào ở phía site: việc xác thực do Google làm.
+ */
+export async function signInWithGoogleAction(): Promise<void> {
+  if (!authEnv()) redirect("/login?error=not_configured");
+
+  const ip = clientIp(new Request("http://x", { headers: await headers() }));
+  if (!checkRateLimit(`google-ip:${ip}`, GOOGLE_LIMIT_PER_IP).ok) redirect("/login?error=rate_limited");
+
+  let url: string | null = null;
+  try {
+    const supabase = await createAuthClient();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${await requestOrigin()}/auth/callback`, queryParams: { prompt: "select_account" } },
+    });
+    if (error) console.error(`[login] Tạo link đăng nhập Google thất bại (${error.status ?? "?"} ${error.code ?? error.name}).`);
+    else url = data.url;
+  } catch (err) {
+    unstable_rethrow(err);
+    console.error("[login] Lỗi không mong đợi khi bắt đầu đăng nhập Google:", err);
+  }
+
+  if (!url) redirect("/login?error=oauth_failed");
+  redirect(url);
 }

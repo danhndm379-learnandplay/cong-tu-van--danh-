@@ -86,3 +86,15 @@ Lưu ý: link trong email mời là link chung tới trang đăng nhập; khách
 - Muốn RLS có tác dụng thì thao tác sửa/xoá phải chạy bằng phiên của người dùng, không phải secret key; xem CLAUDE.md mục "RLS theo VAI TRÒ".
 - Đổi vai trò chỉ có hiệu lực sau khi người đó đăng nhập lại (vai trò nằm trong token, tối đa ~1 giờ).
 - Học viên đăng nhập bằng magic link không có vai trò nên không vào được `/admin` và không đọc được dữ liệu quản trị.
+
+## 9. Đăng nhập bằng Google
+- Trên `/login` có nút **Đăng nhập bằng Google** (trên cùng) và ô nhận link qua email (bên dưới). Bấm nút Google → chọn tài khoản Google → quay về `/auth/callback` → vào `/portal`. Không có ô nhập mật khẩu ở phía site.
+- Code: `components/auth/google-button.tsx` + Server Action `signInWithGoogleAction` (`app/login/actions.ts`), dùng chung `/auth/callback` với link email. Luôn hiện bảng chọn tài khoản (`prompt=select_account`).
+- Email mời trong Make (`loginUrl`) trỏ tới `/login`, tức trang có nút Google; trong Make chỉ cần dùng biến `loginUrl`, không phải sửa gì khi trang đăng nhập đổi.
+- **Danh sách kiểm tra cấu hình** (không nằm trong code):
+  1. Supabase → Authentication → Sign In / Providers → **Google: bật**, nhập Client ID và Client Secret (đã kiểm tra: Supabase báo Google bật và Google chấp nhận client).
+  2. Google Cloud Console → Credentials → OAuth client → **Authorized redirect URIs** có `https://<project-ref>.supabase.co/auth/v1/callback` (đã kiểm tra: không báo `redirect_uri_mismatch`).
+  3. Supabase → Authentication → URL Configuration: **Site URL** `https://cong-tu-van-danh.vercel.app` và **Redirect URLs** có `https://cong-tu-van-danh.vercel.app/auth/callback` và `http://localhost:3000/auth/callback`. Thiếu thì sau khi chọn tài khoản Google, Supabase đưa về Site URL (thường là trang chủ kèm `?code=`) thay vì `/auth/callback` và đăng nhập không hoàn tất.
+  4. Google Cloud Console → OAuth consent screen: nếu trạng thái là **Testing** thì chỉ các **Test users** được liệt kê mới đăng nhập được (người khác thấy "Access blocked"). Trước demo hãy thêm email người thử vào Test users hoặc chuyển sang In production.
+- Cùng email với tài khoản đã có (vd. học viên đã đăng nhập bằng link email, hoặc tài khoản admin) thì Supabase gộp Google vào cùng tài khoản: cùng hồ sơ, và nếu tài khoản đó có vai trò admin/nhân viên thì phiên Google cũng có vai trò đó.
+- Dữ liệu nhận từ Google: email, tên hiển thị, ảnh đại diện (lưu trong Supabase Auth, site chỉ dùng email). Đã ghi vào `/privacy`.
