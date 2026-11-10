@@ -6,10 +6,10 @@
 //   node scripts/create-admin.mjs <email> --force               email đã có tài khoản (vd. học viên): đặt mật khẩu mới + cấp vai trò
 //
 // Cần SUPABASE_URL và SUPABASE_SECRET_KEY trong .env.local (chạy từ thư mục gốc dự án). Script chạy trên database THẬT.
-// Vai trò = app_metadata.role: "admin" (xem, sửa, xoá) hoặc "nhan_vien" (chỉ xem). Trường này chỉ secret key/SQL Editor của Supabase sửa
-// được, người dùng tự sửa thì không. Database (RLS) cũng dựa vào vai trò này để chặn sửa/xoá. Vai trò nằm trong token đăng nhập nên đổi vai
-// trò chỉ có hiệu lực sau khi người đó đăng nhập lại (tối đa ~1 giờ).
-// Muốn thu hồi quyền: xoá tài khoản trong Supabase Dashboard → Authentication → Users, hoặc đặt lại role bằng SQL Editor.
+// Vai trò = app_metadata.role: "admin" (xem, sửa, xoá) hoặc "nhan_vien" (chỉ xem). Trường này chỉ secret key (script này) sửa được, người
+// dùng tự sửa thì không. Không sửa tay trên Dashboard được (không chỉnh được raw JSON), nên luôn gán vai trò bằng script này. Database (RLS) cũng dựa vào vai trò này để chặn sửa/xoá. Đổi vai trò có hiệu lực ngay (RLS tra vai trò hiện tại
+// trong auth.users qua private.staff_role(), không tin vai trò trong token).
+// Muốn thu hồi quyền: xoá tài khoản trong Supabase Dashboard → Authentication → Users (chưa có lệnh thu hồi riêng bằng script).
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";

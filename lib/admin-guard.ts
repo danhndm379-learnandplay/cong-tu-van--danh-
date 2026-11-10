@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect, unstable_rethrow } from "next/navigation";
-import { ADMIN_LOGIN_PATH, canModifyData, staffRole, type StaffRole } from "@/lib/admin-role";
+import { ADMIN_HOME_PATH, ADMIN_LOGIN_PATH, canModifyData, staffRole, type StaffRole } from "@/lib/admin-role";
 import { authEnv } from "@/lib/auth-env";
 import { createAuthClient } from "@/lib/supabase-auth";
 
@@ -38,6 +38,17 @@ export async function requireStaff(): Promise<StaffUser & { canWrite: boolean }>
   const user = await getStaffUser();
   if (!user) redirect(ADMIN_LOGIN_PATH);
   return { ...user, canWrite: canModifyData(user.role) };
+}
+
+/**
+ * Trang CHỈ dành cho admin (vd. quản lý tài khoản nội bộ). Chưa đăng nhập: sang trang đăng nhập. Nhân viên: về trang chủ admin
+ * (họ vẫn là người dùng hợp lệ của khu quản trị, chỉ là không có quyền ở trang này).
+ */
+export async function requireAdmin(): Promise<StaffUser> {
+  const user = await getStaffUser();
+  if (!user) redirect(ADMIN_LOGIN_PATH);
+  if (!canModifyData(user.role)) redirect(ADMIN_HOME_PATH);
+  return user;
 }
 
 export type StaffCheck = { ok: true; user: StaffUser } | { ok: false; error: string };

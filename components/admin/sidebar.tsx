@@ -8,6 +8,7 @@ import {
   LogOut,
   MessageSquare,
   School,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -16,13 +17,19 @@ import { ROLE_LABELS, type StaffRole } from "@/lib/admin-role";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
-export const adminNavItems: { name: string; href: string; icon: LucideIcon }[] = [
+export const adminNavItems: { name: string; href: string; icon: LucideIcon; adminOnly?: boolean }[] = [
   { name: "Tổng quan", href: "/admin", icon: LayoutDashboard },
   { name: "Yêu cầu", href: "/admin/requests", icon: FileClock },
   { name: "Trường tham chiếu", href: "/admin/schools", icon: School },
   { name: "Hồ sơ học viên", href: "/admin/profiles", icon: Users },
   { name: "Hội thoại", href: "/admin/conversations", icon: MessageSquare },
+  { name: "Tài khoản nội bộ", href: "/admin/accounts", icon: ShieldCheck, adminOnly: true },
 ];
+
+/** Mục menu theo vai trò: mục chỉ dành cho admin bị ẩn với nhân viên (ẩn menu chỉ để gọn; chặn thật nằm ở trang và Server Action). */
+function navItemsFor(role: StaffRole | null) {
+  return adminNavItems.filter((item) => !item.adminOnly || role === "admin");
+}
 
 function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
@@ -41,7 +48,7 @@ export function AdminSidebar({ email, role }: { email: string | null; role: Staf
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {adminNavItems.map((item) => {
+        {navItemsFor(role).map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
@@ -96,12 +103,12 @@ export function AdminSidebar({ email, role }: { email: string | null; role: Staf
   );
 }
 
-export function AdminMobileNav() {
+export function AdminMobileNav({ role }: { role: StaffRole | null }) {
   const pathname = usePathname();
 
   return (
     <nav className="flex gap-1 overflow-x-auto border-b bg-sidebar px-3 py-2 lg:hidden">
-      {adminNavItems.map((item) => {
+      {navItemsFor(role).map((item) => {
         const active = isActive(pathname, item.href);
         const Icon = item.icon;
         return (

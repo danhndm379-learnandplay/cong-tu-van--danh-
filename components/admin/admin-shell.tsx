@@ -13,7 +13,7 @@ export function AdminShell({ email, role, children }: { email: string | null; ro
     <div className="flex min-h-screen">
       <AdminSidebar email={email} role={role} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminMobileNav />
+        <AdminMobileNav role={role} />
         <main className="flex-1 px-6 py-8 md:px-10 md:py-10">{children}</main>
       </div>
     </div>
